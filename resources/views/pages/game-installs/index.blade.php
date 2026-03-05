@@ -31,6 +31,13 @@ new #[Title('Game Installs')] class extends Component
         return GameInstall::query()->orderBy('name')->get();
     }
 
+    #[Computed]
+    public function shouldPoll(): bool
+    {
+        return $this->installs->contains(fn (GameInstall $install) => $install->installation_status === GameInstallStatus::Installing || $install->installation_status === GameInstallStatus::Queued
+        );
+    }
+
     public function getListeners(): array
     {
         $listeners = [];
@@ -60,15 +67,15 @@ new #[Title('Game Installs')] class extends Component
             $this->installOutputs[$id]['lines'] = array_slice($this->installOutputs[$id]['lines'], -200);
         }
 
-        // If the install finished, refresh the installs list
-        if (str_contains($line, 'completed successfully') || str_contains($line, 'failed')) {
-            unset($this->installs);
-        }
+        // Refresh installs to pick up status changes (Queued → Installing → Installed/Failed)
+        unset($this->installs);
     }
 
     public function toggleLogs(int $installId): void
     {
-        $this->showLogs[$installId] = ! ($this->showLogs[$installId] ?? false);
+        $install = $this->installs->firstWhere('id', $installId);
+        $isActive = $install && ($install->installation_status === GameInstallStatus::Installing || $install->installation_status === GameInstallStatus::Queued);
+        $this->showLogs[$installId] = ! ($this->showLogs[$installId] ?? $isActive);
     }
 
     public function getProgress(int $installId): int
@@ -105,6 +112,7 @@ new #[Title('Game Installs')] class extends Component
 
         Log::info('User '.auth()->id().' ('.auth()->user()->name.") queued game install '{$install->name}' (branch: {$install->branch})");
 
+        $this->installOutputs[$install->id] = ['progress' => 0, 'lines' => []];
         $this->showCreateModal = false;
         unset($this->installs);
 
@@ -139,6 +147,10 @@ new #[Title('Game Installs')] class extends Component
             $install = GameInstall::query()->find($this->deletingInstallId);
 
             if ($install) {
+                if ($install->installation_status === GameInstallStatus::Installing || $install->installation_status === GameInstallStatus::Queued) {
+                    return;
+                }
+
                 $path = $install->getInstallationPath();
                 $install->delete();
 
@@ -167,7 +179,7 @@ new #[Title('Game Installs')] class extends Component
     }
 }; ?>
 
-<section class="w-full">
+<section class="w-full" @if($this->shouldPoll) wire:poll.5s @endif>
     <div class="flex items-center justify-between mb-6">
         <div>
             <flux:heading size="xl">{{ __('Game Installs') }}</flux:heading>
@@ -213,11 +225,13 @@ new #[Title('Game Installs')] class extends Component
                                 {{ $install->getInstallationPath() }}
                             </flux:text>
 
-                            @if ($install->installation_status === GameInstallStatus::Installing)
+                            @if ($install->installation_status === GameInstallStatus::Installing || $install->installation_status === GameInstallStatus::Queued)
                                 @php $progress = $this->getProgress($install->id) ?: $install->progress_pct; @endphp
                                 <div class="mt-2 w-64">
                                     <div class="flex items-center justify-between mb-1">
-                                        <span class="text-xs text-zinc-500 dark:text-zinc-400">{{ __('Downloading...') }}</span>
+                                        <span class="text-xs text-zinc-500 dark:text-zinc-400">
+                                            {{ $install->installation_status === GameInstallStatus::Queued ? __('Queued...') : __('Downloading...') }}
+                                        </span>
                                         <span class="text-xs font-medium">{{ $progress }}%</span>
                                     </div>
                                     <div class="h-1.5 w-full rounded-full bg-zinc-200 dark:bg-zinc-700">
@@ -243,13 +257,13 @@ new #[Title('Game Installs')] class extends Component
                                     {{ $install->installation_status === GameInstallStatus::Installed ? __('Update') : __('Install') }}
                                 </flux:button>
                             @endif
-                            <flux:button size="sm" variant="danger" wire:click="confirmDelete({{ $install->id }})" icon="trash">
+                            <flux:button size="sm" variant="danger" wire:click="confirmDelete({{ $install->id }})" icon="trash" :disabled="$install->installation_status === GameInstallStatus::Installing || $install->installation_status === GameInstallStatus::Queued">
                                 {{ __('Delete') }}
                             </flux:button>
                         </div>
                     </div>
 
-                    @if ($this->showLogs[$install->id] ?? false)
+                    @if ($this->showLogs[$install->id] ?? ($install->installation_status === GameInstallStatus::Installing || $install->installation_status === GameInstallStatus::Queued))
                         @php $lines = $this->getLogLines($install->id); @endphp
                         <div class="mt-3 rounded bg-zinc-900 text-zinc-100 p-3 font-mono text-xs max-h-64 overflow-y-auto" x-data x-init="$nextTick(() => $el.scrollTop = $el.scrollHeight)" wire:key="logs-{{ $install->id }}">
                             @forelse ($lines as $logLine)

@@ -112,7 +112,7 @@ class GameInstallManagementTest extends TestCase
     {
         $this->actingAs($this->user);
 
-        $install = GameInstall::factory()->create();
+        $install = GameInstall::factory()->installed()->create();
 
         $path = $install->getInstallationPath();
         @mkdir($path, 0755, true);

@@ -23,6 +23,13 @@ new #[Title('Workshop Mods')] class extends Component
         return WorkshopMod::query()->orderByDesc('created_at')->get();
     }
 
+    #[Computed]
+    public function shouldPoll(): bool
+    {
+        return $this->mods->contains(fn (WorkshopMod $mod) => $mod->installation_status === InstallationStatus::Installing || $mod->installation_status === InstallationStatus::Queued
+        );
+    }
+
     public function getListeners(): array
     {
         $listeners = [];
@@ -52,15 +59,15 @@ new #[Title('Workshop Mods')] class extends Component
             $this->modOutputs[$id]['lines'] = array_slice($this->modOutputs[$id]['lines'], -200);
         }
 
-        // If the download finished, refresh the mods list
-        if (str_contains($line, 'completed successfully') || str_contains($line, 'failed')) {
-            unset($this->mods);
-        }
+        // Refresh mods to pick up status changes (Queued → Installing → Installed/Failed)
+        unset($this->mods);
     }
 
     public function toggleLogs(int $modId): void
     {
-        $this->showLogs[$modId] = ! ($this->showLogs[$modId] ?? false);
+        $mod = $this->mods->firstWhere('id', $modId);
+        $isActive = $mod && ($mod->installation_status === InstallationStatus::Installing || $mod->installation_status === InstallationStatus::Queued);
+        $this->showLogs[$modId] = ! ($this->showLogs[$modId] ?? $isActive);
     }
 
     public function getProgress(int $modId): int
@@ -95,6 +102,7 @@ new #[Title('Workshop Mods')] class extends Component
 
         if ($mod->installation_status !== InstallationStatus::Installed) {
             DownloadModJob::dispatch($mod);
+            $this->modOutputs[$mod->id] = ['progress' => 0, 'lines' => []];
             Log::info('User '.auth()->id().' ('.auth()->user()->name.") queued mod download: workshop ID {$workshopId}");
         }
 
@@ -116,6 +124,10 @@ new #[Title('Workshop Mods')] class extends Component
 
     public function deleteMod(WorkshopMod $mod): void
     {
+        if ($mod->installation_status === InstallationStatus::Installing || $mod->installation_status === InstallationStatus::Queued) {
+            return;
+        }
+
         $mod->presets()->detach();
         $mod->delete();
 
@@ -141,7 +153,7 @@ new #[Title('Workshop Mods')] class extends Component
     }
 }; ?>
 
-<section class="w-full">
+<section class="w-full" @if($this->shouldPoll) wire:poll.5s @endif>
     <div class="mb-6">
         <flux:heading size="xl">{{ __('Workshop Mods') }}</flux:heading>
         <flux:text class="mt-2">{{ __('Download and manage Steam Workshop mods.') }}</flux:text>
@@ -187,18 +199,20 @@ new #[Title('Workshop Mods')] class extends Component
                                 @endif
                             </td>
                             <td class="px-4 py-3">
-                                @if ($mod->installation_status === InstallationStatus::Installing)
-                                    @php $progress = $this->getProgress($mod->id) ?: $mod->progress_pct; @endphp
-                                    <div class="w-32">
-                                        <div class="flex items-center gap-2 mb-1">
-                                            <flux:badge variant="warning" size="sm">{{ __('Downloading') }}</flux:badge>
-                                            <span class="text-xs font-medium">{{ $progress }}%</span>
-                                        </div>
-                                        <div class="h-1.5 w-full rounded-full bg-zinc-200 dark:bg-zinc-700">
-                                            <div class="h-1.5 rounded-full bg-amber-500 transition-all duration-500" style="width: {{ $progress }}%"></div>
-                                        </div>
+                            @if ($mod->installation_status === InstallationStatus::Installing || $mod->installation_status === InstallationStatus::Queued)
+                                @php $progress = $this->getProgress($mod->id) ?: $mod->progress_pct; @endphp
+                                <div class="w-32">
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <flux:badge :variant="$mod->installation_status === InstallationStatus::Queued ? 'secondary' : 'warning'" size="sm">
+                                            {{ $mod->installation_status === InstallationStatus::Queued ? __('Queued') : __('Downloading') }}
+                                        </flux:badge>
+                                        <span class="text-xs font-medium">{{ $progress }}%</span>
                                     </div>
-                                @else
+                                    <div class="h-1.5 w-full rounded-full bg-zinc-200 dark:bg-zinc-700">
+                                        <div class="h-1.5 rounded-full bg-amber-500 transition-all duration-500" style="width: {{ $progress }}%"></div>
+                                    </div>
+                                </div>
+                            @else
                                     <flux:badge :variant="$this->statusVariant($mod->installation_status)" size="sm">
                                         {{ ucfirst($mod->installation_status->value) }}
                                     </flux:badge>
@@ -216,15 +230,13 @@ new #[Title('Workshop Mods')] class extends Component
                                             {{ __('Retry') }}
                                         </flux:button>
                                     @endif
-                                    @if ($mod->installation_status !== InstallationStatus::Installing)
-                                        <flux:button size="sm" variant="danger" wire:click="deleteMod({{ $mod->id }})" wire:confirm="Delete this mod?" icon="trash">
-                                            {{ __('Delete') }}
-                                        </flux:button>
-                                    @endif
+                                    <flux:button size="sm" variant="danger" wire:click="deleteMod({{ $mod->id }})" wire:confirm="Delete this mod?" icon="trash" :disabled="$mod->installation_status === InstallationStatus::Installing || $mod->installation_status === InstallationStatus::Queued">
+                                        {{ __('Delete') }}
+                                    </flux:button>
                                 </div>
                             </td>
                         </tr>
-                        @if ($this->showLogs[$mod->id] ?? false)
+                        @if ($this->showLogs[$mod->id] ?? ($mod->installation_status === InstallationStatus::Installing || $mod->installation_status === InstallationStatus::Queued))
                             <tr wire:key="mod-logs-{{ $mod->id }}">
                                 <td colspan="5" class="px-4 py-3">
                                     @php $lines = $this->getLogLines($mod->id); @endphp
