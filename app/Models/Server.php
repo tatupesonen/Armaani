@@ -52,10 +52,6 @@ class Server extends Model
         return $this->getInstallationPath().'/profiles';
     }
 
-    /**
-     * Get the binary directory — uses the linked game install if set,
-     * otherwise falls back to the server's own install path.
-     */
     public function getBinaryPath(): string
     {
         return $this->gameInstall

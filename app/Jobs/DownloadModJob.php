@@ -48,7 +48,7 @@ class DownloadModJob implements ShouldQueue
         while ($process->running()) {
             sleep(1);
 
-            if ($expectedSize && $expectedSize > 0) {
+            if ($expectedSize > 0) {
                 $currentSize = $this->getDirectorySize($modPath);
                 $pct = min(99, (int) round(($currentSize / $expectedSize) * 100));
 
@@ -67,13 +67,12 @@ class DownloadModJob implements ShouldQueue
 
         $result = $process->wait();
 
-        // Broadcast any SteamCMD output that was captured
         $output = trim($result->output().' '.$result->errorOutput());
         if ($output) {
             foreach (explode("\n", $output) as $outputLine) {
                 $trimmed = trim($outputLine);
                 if ($trimmed !== '') {
-                    ModDownloadOutput::dispatch($this->mod->id, $lastProgressUpdate > 0 ? $lastProgressUpdate : 0, $trimmed);
+                    ModDownloadOutput::dispatch($this->mod->id, max($lastProgressUpdate, 0), $trimmed);
                 }
             }
         }

@@ -28,9 +28,7 @@ new #[Title('Workshop Mods')] class extends Component
         $listeners = [];
 
         foreach ($this->mods as $mod) {
-            if ($mod->installation_status === InstallationStatus::Installing || $mod->installation_status === InstallationStatus::Queued) {
-                $listeners["echo:mod-download.{$mod->id},ModDownloadOutput"] = 'handleModOutput';
-            }
+            $listeners["echo:mod-download.{$mod->id},ModDownloadOutput"] = 'handleModOutput';
         }
 
         return $listeners;

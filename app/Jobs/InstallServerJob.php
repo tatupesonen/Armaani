@@ -9,6 +9,7 @@ use App\Services\SteamCmdService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Process;
 
 class InstallServerJob implements ShouldQueue
 {
@@ -47,12 +48,10 @@ class InstallServerJob implements ShouldQueue
 
                 $pctToSend = $this->gameInstall->progress_pct;
 
-                // Parse: " Update state (0x61) downloading, progress: 44.53 (2397543803 / 5384428737)"
                 if (preg_match('/progress:\s*([\d.]+)\s*\((\d+)\s*\/\s*(\d+)\)/', $line, $m)) {
                     $pct = (int) round((float) $m[1]);
                     $totalBytes = (int) $m[3];
 
-                    // Throttle DB writes — only update every percentage point
                     if ($pct >= $lastProgressUpdate + 1 || $pct === 100) {
                         $lastProgressUpdate = $pct;
                         $pctToSend = $pct;
@@ -73,7 +72,6 @@ class InstallServerJob implements ShouldQueue
         );
 
         if ($result->successful()) {
-            // After install, record actual disk size
             $diskSize = $this->getDirectorySize($installDir);
 
             $this->gameInstall->update([
@@ -103,7 +101,7 @@ class InstallServerJob implements ShouldQueue
             return 0;
         }
 
-        $result = \Illuminate\Support\Facades\Process::run(['du', '-sb', $path]);
+        $result = Process::run(['du', '-sb', $path]);
 
         if (! $result->successful()) {
             return 0;

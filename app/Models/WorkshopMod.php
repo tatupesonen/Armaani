@@ -47,9 +47,7 @@ class WorkshopMod extends Model
     public function getNormalizedName(): string
     {
         $name = $this->name ?? (string) $this->workshop_id;
-        $name = trim($name);
-        $name = preg_replace('/[^A-Za-z0-9_]/', '', $name);
-        $name = preg_replace('/\s+/', '_', $name);
+        $name = preg_replace('/[^A-Za-z0-9_]/', '', trim($name));
 
         return '@'.$name;
     }

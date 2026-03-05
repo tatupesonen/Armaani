@@ -36,9 +36,7 @@ new #[Title('Game Installs')] class extends Component
         $listeners = [];
 
         foreach ($this->installs as $install) {
-            if ($install->installation_status === GameInstallStatus::Installing || $install->installation_status === GameInstallStatus::Queued) {
-                $listeners["echo:game-install.{$install->id},GameInstallOutput"] = 'handleInstallOutput';
-            }
+            $listeners["echo:game-install.{$install->id},GameInstallOutput"] = 'handleInstallOutput';
         }
 
         return $listeners;

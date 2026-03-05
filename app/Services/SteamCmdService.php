@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\SteamAccount;
+use Illuminate\Contracts\Process\ProcessResult;
+use Illuminate\Process\InvokedProcess;
 use Illuminate\Support\Facades\Process;
 use RuntimeException;
 
@@ -16,16 +18,17 @@ class SteamCmdService
      *
      * @param  callable(string): void  $onOutput
      */
-    public function installServer(string $installDir, string $branch = 'public', ?callable $onOutput = null): \Illuminate\Contracts\Process\ProcessResult
+    public function installServer(string $installDir, string $branch = 'public', ?callable $onOutput = null): ProcessResult
     {
         $args = $this->baseArgs($installDir);
 
+        $appUpdate = '+app_update '.config('arma.server_app_id');
+
         if ($branch !== 'public') {
-            $args[] = '+app_update '.config('arma.server_app_id').' -beta '.$branch.' validate';
-        } else {
-            $args[] = '+app_update '.config('arma.server_app_id').' validate';
+            $appUpdate .= ' -beta '.$branch;
         }
 
+        $args[] = $appUpdate.' validate';
         $args[] = '+quit';
 
         if ($onOutput === null) {
@@ -34,7 +37,7 @@ class SteamCmdService
 
         $steamcmdPath = config('arma.steamcmd_path');
 
-        return \Illuminate\Support\Facades\Process::timeout(7200)
+        return Process::timeout(7200)
             ->run(array_merge([$steamcmdPath], $args), function (string $type, string $output) use ($onOutput): void {
                 foreach (explode("\n", $output) as $line) {
                     $line = trim($line);
@@ -49,7 +52,7 @@ class SteamCmdService
      * Start a SteamCMD workshop mod download asynchronously.
      * Returns a pending process so the caller can poll while it runs.
      */
-    public function startDownloadMod(string $installDir, int $workshopId): \Illuminate\Process\InvokedProcess
+    public function startDownloadMod(string $installDir, int $workshopId): InvokedProcess
     {
         $args = $this->baseArgs($installDir);
         $args[] = '+workshop_download_item '.config('arma.game_id').' '.$workshopId.' validate';
@@ -57,14 +60,14 @@ class SteamCmdService
 
         $steamcmdPath = config('arma.steamcmd_path');
 
-        return \Illuminate\Support\Facades\Process::timeout(3600)
+        return Process::timeout(3600)
             ->start(array_merge([$steamcmdPath], $args));
     }
 
     /**
      * Build and run a SteamCMD command to download a single workshop mod.
      */
-    public function downloadMod(string $installDir, int $workshopId): \Illuminate\Contracts\Process\ProcessResult
+    public function downloadMod(string $installDir, int $workshopId): ProcessResult
     {
         $args = $this->baseArgs($installDir);
         $args[] = '+workshop_download_item '.config('arma.game_id').' '.$workshopId.' validate';
@@ -92,7 +95,7 @@ class SteamCmdService
     /**
      * @param  list<string>  $args
      */
-    protected function run(array $args): \Illuminate\Contracts\Process\ProcessResult
+    protected function run(array $args): ProcessResult
     {
         $steamcmdPath = config('arma.steamcmd_path');
 

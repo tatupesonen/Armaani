@@ -330,6 +330,17 @@ ArmaMan is a web-based Arma 3 dedicated server manager built with Laravel 12, Li
 - Presets can be shared across multiple server instances.
 - Presets have separate create and edit pages (unlike servers which use inline panels).
 
+### Missions (PBO Files)
+- PBO (Packed Bank of Files) mission files uploaded by users and stored in a shared pool (`missions_base_path`).
+- **No database model** — purely filesystem-based. The missions page scans the directory for `.pbo` files.
+- Missions are global (shared across all game installs/servers).
+- On server start, `ServerProcessService::symlinkMissions()` symlinks all PBOs from the shared pool into the game install's `mpmissions/` directory.
+- Supports batch upload of multiple `.pbo` files with upload progress (Alpine.js + Livewire upload events).
+- Users can upload, download, and delete mission files from the Missions page.
+- Non-`.pbo` files are silently skipped during upload.
+- Uploading a file with the same name silently overwrites it.
+- Livewire `WithFileUploads` trait handles file uploads; max upload size configured to 512MB in `config/livewire.php`.
+
 ### Headless Clients
 - Each Arma 3 server instance can have headless clients launched alongside it.
 - Headless clients offload AI processing from the main server.
@@ -390,21 +401,24 @@ ArmaMan is a web-based Arma 3 dedicated server manager built with Laravel 12, Li
 - Game install files: `{SERVERS_BASE_PATH}/game/{game_install_id}/`
 - Workshop mods: `{MODS_BASE_PATH}/steamapps/workshop/content/107410/{workshop_id}/`
 - Mod symlinks into server dirs: `{server_path}/@{normalized_mod_name}`
+- Mission PBOs (shared pool): `{MISSIONS_BASE_PATH}/`
+- Mission symlinks into game installs: `{SERVERS_BASE_PATH}/game/{id}/mpmissions/`
 - All paths are configurable via environment variables.
 
 ### Docker Deployment
 - The application ships as a single Docker container.
 - The container includes: PHP-FPM, Nginx, SteamCMD, Node.js (for asset building), SQLite.
 - Supervisord manages: Nginx, PHP-FPM, the Laravel queue worker, and Laravel Reverb (WebSocket server on port 8080).
-- Storage volumes for: database, server files, mod files, Laravel storage.
+- Storage volumes for: database, server files, mod files, mission files, Laravel storage.
 - A `docker-compose.yml` is provided for easy deployment.
-- `storage/arma/servers` and `storage/arma/mods` are gitignored.
+- `storage/arma/servers`, `storage/arma/mods`, and `storage/arma/missions` are gitignored.
 
 ### Environment Variables (Custom)
 - `STEAMCMD_PATH` - Path to SteamCMD executable (default: `/usr/games/steamcmd`)
 - `STEAM_API_KEY` - Steam Web API key for fetching workshop mod metadata
 - `SERVERS_BASE_PATH` - Base directory for game install downloads
 - `MODS_BASE_PATH` - Base directory for mod downloads
+- `MISSIONS_BASE_PATH` - Base directory for uploaded PBO mission files
 
 ## Data Model
 
@@ -433,7 +447,7 @@ ArmaMan is a web-based Arma 3 dedicated server manager built with Laravel 12, Li
 ### Services
 - `app/Services/SteamCmdService.php` — `installServer(dir, branch, ?callable): ProcessResult`, `startDownloadMod(dir, id): InvokedProcess`, `downloadMod(dir, id): ProcessResult`, `validateCredentials(user, pass): bool`
 - `app/Services/SteamWorkshopService.php` — `getModDetails(id): ?array`, `validateApiKey(key): array`, `getApiKey(): ?string`
-- `app/Services/ServerProcessService.php` — `start()`, `stop()`, `restart()`, `isRunning()`, `getStatus()`, `startHeadlessClients()`, `stopHeadlessClients()`, `generateServerConfig()`, `startLogTail()`, `stopLogTail()`
+- `app/Services/ServerProcessService.php` — `start()`, `stop()`, `restart()`, `isRunning()`, `getStatus()`, `startHeadlessClients()`, `stopHeadlessClients()`, `generateServerConfig()`, `symlinkMissions()`, `startLogTail()`, `stopLogTail()`
 - `app/Services/PresetImportService.php` — `parseHtmlPreset(html): Collection`, `parsePresetName(html): ?string`, `importFromHtml(html, ?name): ModPreset`
 
 ### Broadcast Events
@@ -455,16 +469,17 @@ ArmaMan is a web-based Arma 3 dedicated server manager built with Laravel 12, Li
 - `resources/views/pages/presets/index.blade.php` — preset list, delete
 - `resources/views/pages/presets/create.blade.php` — create preset with mod selection + HTML import
 - `resources/views/pages/presets/edit.blade.php` — edit preset, manage mods
+- `resources/views/pages/missions/index.blade.php` — mission PBO upload/download/delete, upload progress bar, filesystem-based (no DB model)
 - `resources/views/pages/steam-settings.blade.php` — manage Steam credentials and API key
 
 ### Frontend / JS
 - `resources/js/app.js` — Laravel Echo configured for Reverb (pusher-js transport)
 
 ### Config
-- `config/arma.php` — `steamcmd_path`, `steam_api_key`, `servers_base_path`, `mods_base_path`, `server_app_id` (233780), `game_id` (107410)
+- `config/arma.php` — `steamcmd_path`, `steam_api_key`, `servers_base_path`, `mods_base_path`, `missions_base_path`, `server_app_id` (233780), `game_id` (107410)
 - `config/broadcasting.php` — Reverb connection configured
 - `config/reverb.php` — published Reverb config
-- `config/livewire.php` — `emoji => false`
+- `config/livewire.php` — `emoji => false`, `temporary_file_upload.rules` set to 512MB max
 
 ### Docker
 - `docker/supervisord.conf` — nginx, php-fpm, queue-worker (database driver), reverb (port 8080)
@@ -473,7 +488,8 @@ ArmaMan is a web-based Arma 3 dedicated server manager built with Laravel 12, Li
 ### Tests
 - `tests/Feature/GameInstalls/GameInstallManagementTest.php`
 - `tests/Feature/Servers/ServerManagementTest.php`
-- `tests/Feature/Servers/ServerProcessServiceTest.php` — server.cfg generation tests
+- `tests/Feature/Servers/ServerProcessServiceTest.php` — server.cfg generation + mission symlink tests
+- `tests/Feature/Missions/MissionManagementTest.php` — PBO upload, download, delete, path traversal protection
 - `tests/Feature/Mods/WorkshopModManagementTest.php`
 - `tests/Feature/Jobs/DownloadModJobTest.php` — mocks `SteamCmdService::startDownloadMod()` returning a mock `InvokedProcess`; uses `Process::fake(['du *' => ...])` for disk size
 - `tests/Feature/Presets/ModPresetManagementTest.php`

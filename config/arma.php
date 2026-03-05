@@ -52,6 +52,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Missions Base Path
+    |--------------------------------------------------------------------------
+    |
+    | The base directory where uploaded PBO mission files are stored.
+    | These files are symlinked into each game install's mpmissions/
+    | directory when a server is started.
+    |
+    */
+
+    'missions_base_path' => env('MISSIONS_BASE_PATH', storage_path('arma/missions')),
+
+    /*
+    |--------------------------------------------------------------------------
     | Arma 3 Steam IDs
     |--------------------------------------------------------------------------
     |

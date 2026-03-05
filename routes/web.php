@@ -13,6 +13,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::livewire('mods', 'pages::mods.index')->name('mods.index');
 
+    Route::livewire('missions', 'pages::missions.index')->name('missions.index');
+    Route::get('missions/{filename}/download', function (string $filename) {
+        $path = config('arma.missions_base_path').'/'.basename($filename);
+        abort_unless(file_exists($path), 404);
+
+        return response()->download($path);
+    })->name('missions.download')->where('filename', '.+');
+
     Route::livewire('presets', 'pages::presets.index')->name('presets.index');
     Route::livewire('presets/create', 'pages::presets.create')->name('presets.create');
     Route::livewire('presets/{modPreset}/edit', 'pages::presets.edit')->name('presets.edit');

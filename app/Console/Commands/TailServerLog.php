@@ -34,7 +34,6 @@ class TailServerLog extends Command
             return self::FAILURE;
         }
 
-        // Seek to end of file
         fseek($handle, 0, SEEK_END);
 
         while (true) {
@@ -47,7 +46,6 @@ class TailServerLog extends Command
                     ServerLogOutput::dispatch($server->id, $trimmed);
                 }
             } else {
-                // No new data — check if the file was truncated/rotated
                 clearstatcache(false, $logPath);
                 $currentSize = filesize($logPath);
                 $position = ftell($handle);
@@ -56,7 +54,7 @@ class TailServerLog extends Command
                     fseek($handle, 0);
                 }
 
-                usleep(250000); // 250ms
+                usleep(250_000);
             }
         }
 

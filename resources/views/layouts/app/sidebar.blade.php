@@ -24,6 +24,9 @@
                     <flux:sidebar.item icon="puzzle-piece" :href="route('mods.index')" :current="request()->routeIs('mods.*')" wire:navigate>
                         {{ __('Workshop Mods') }}
                     </flux:sidebar.item>
+                    <flux:sidebar.item icon="document-arrow-up" :href="route('missions.index')" :current="request()->routeIs('missions.*')" wire:navigate>
+                        {{ __('Missions') }}
+                    </flux:sidebar.item>
                     <flux:sidebar.item icon="list-bullet" :href="route('presets.index')" :current="request()->routeIs('presets.*')" wire:navigate>
                         {{ __('Mod Presets') }}
                     </flux:sidebar.item>

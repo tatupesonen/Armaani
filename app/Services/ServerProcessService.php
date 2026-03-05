@@ -23,6 +23,7 @@ class ServerProcessService
         }
 
         $this->generateServerConfig($server);
+        $this->symlinkMissions($server);
 
         $command = $this->buildLaunchCommand($server);
         $pidFile = $this->getPidFilePath($server);
@@ -171,9 +172,7 @@ class ServerProcessService
             return '';
         }
 
-        $mods = $preset->mods()->get();
-
-        return $mods->map(fn ($mod) => $mod->getNormalizedName())->implode(';');
+        return $preset->mods->map(fn ($mod) => $mod->getNormalizedName())->implode(';');
     }
 
     /**
@@ -225,6 +224,37 @@ class ServerProcessService
             $server->getProfilesPath().'/server.cfg',
             implode("\n", $lines)."\n"
         );
+    }
+
+    /**
+     * Symlink all PBO mission files from the shared missions pool
+     * into the game install's mpmissions directory.
+     */
+    protected function symlinkMissions(Server $server): void
+    {
+        $missionsPath = config('arma.missions_base_path');
+        $mpmissionsPath = $server->getInstallationPath().'/mpmissions';
+
+        if (! is_dir($missionsPath)) {
+            return;
+        }
+
+        if (! is_dir($mpmissionsPath)) {
+            mkdir($mpmissionsPath, 0755, true);
+        }
+
+        $existingLinks = glob($mpmissionsPath.'/*.pbo') ?: [];
+        foreach ($existingLinks as $link) {
+            if (is_link($link)) {
+                unlink($link);
+            }
+        }
+
+        $pboFiles = glob($missionsPath.'/*.pbo') ?: [];
+        foreach ($pboFiles as $pboFile) {
+            $linkPath = $mpmissionsPath.'/'.basename($pboFile);
+            symlink($pboFile, $linkPath);
+        }
     }
 
     protected function startHeadlessClient(Server $server, int $index): void
@@ -292,11 +322,7 @@ class ServerProcessService
 
     protected function cleanupPidFile(Server $server): void
     {
-        $pidFile = $this->getPidFilePath($server);
-
-        if (file_exists($pidFile)) {
-            @unlink($pidFile);
-        }
+        @unlink($this->getPidFilePath($server));
     }
 
     /**
