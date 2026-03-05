@@ -3,7 +3,6 @@
 use App\Enums\InstallationStatus;
 use App\Jobs\DownloadModJob;
 use App\Models\WorkshopMod;
-use App\Services\SteamWorkshopService;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -16,26 +15,6 @@ new #[Title('Workshop Mods')] class extends Component
     public function mods()
     {
         return WorkshopMod::query()->orderByDesc('created_at')->get();
-    }
-
-    /**
-     * Get download progress for all currently-installing mods.
-     *
-     * @return array<int, int>
-     */
-    #[Computed]
-    public function downloadProgress(): array
-    {
-        $workshop = app(SteamWorkshopService::class);
-        $progress = [];
-
-        foreach ($this->mods as $mod) {
-            if ($mod->installation_status === InstallationStatus::Installing) {
-                $progress[$mod->id] = $workshop->getDownloadProgress($mod->workshop_id, $mod->file_size);
-            }
-        }
-
-        return $progress;
     }
 
     public function addMod(): void
@@ -63,21 +42,28 @@ new #[Title('Workshop Mods')] class extends Component
         }
 
         $this->workshopId = '';
-        unset($this->mods, $this->downloadProgress);
+        unset($this->mods);
     }
 
     public function retryMod(WorkshopMod $mod): void
     {
         $mod->update(['installation_status' => InstallationStatus::Queued]);
         DownloadModJob::dispatch($mod);
-        unset($this->mods, $this->downloadProgress);
+        unset($this->mods);
     }
 
     public function deleteMod(WorkshopMod $mod): void
     {
         $mod->presets()->detach();
         $mod->delete();
-        unset($this->mods, $this->downloadProgress);
+
+        $path = $mod->getInstallationPath();
+
+        if (is_dir($path)) {
+            \Illuminate\Support\Facades\Process::run(['rm', '-rf', $path]);
+        }
+
+        unset($this->mods);
     }
 
     public function statusVariant(InstallationStatus $status): string
@@ -101,9 +87,11 @@ new #[Title('Workshop Mods')] class extends Component
         <div class="flex-1">
             <flux:input wire:model="workshopId" :label="__('Workshop ID')" :placeholder="__('e.g. 463939057')" />
         </div>
-        <flux:button variant="primary" type="submit" icon="plus">
-            {{ __('Add Mod') }}
-        </flux:button>
+        <div>
+            <flux:button variant="primary" type="submit" icon="plus">
+                {{ __('Add Mod') }}
+            </flux:button>
+        </div>
     </form>
 
     @if ($this->mods->isEmpty())
@@ -113,7 +101,7 @@ new #[Title('Workshop Mods')] class extends Component
     @else
         <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden" wire:poll.2s>
             <table class="w-full text-left text-sm">
-                <thead class="bg-zinc-50 dark:bg-zinc-800/50">
+                <thead class="bg-zinc-50 dark:bg-zinc-800/50 text-zinc-600 dark:text-zinc-300">
                     <tr>
                         <th class="px-4 py-3 font-medium">{{ __('Workshop ID') }}</th>
                         <th class="px-4 py-3 font-medium">{{ __('Name') }}</th>
@@ -135,15 +123,14 @@ new #[Title('Workshop Mods')] class extends Component
                                 @endif
                             </td>
                             <td class="px-4 py-3">
-                                @if ($mod->installation_status === InstallationStatus::Installing && isset($this->downloadProgress[$mod->id]))
-                                    @php $pct = $this->downloadProgress[$mod->id]; @endphp
+                                @if ($mod->installation_status === InstallationStatus::Installing)
                                     <div class="w-32">
                                         <div class="flex items-center gap-2 mb-1">
                                             <flux:badge variant="warning" size="sm">{{ __('Downloading') }}</flux:badge>
-                                            <span class="text-xs font-medium">{{ $pct }}%</span>
+                                            <span class="text-xs font-medium">{{ $mod->progress_pct }}%</span>
                                         </div>
                                         <div class="h-1.5 w-full rounded-full bg-zinc-200 dark:bg-zinc-700">
-                                            <div class="h-1.5 rounded-full bg-amber-500 transition-all duration-500" style="width: {{ $pct }}%"></div>
+                                            <div class="h-1.5 rounded-full bg-amber-500 transition-all duration-500" style="width: {{ $mod->progress_pct }}%"></div>
                                         </div>
                                     </div>
                                 @else

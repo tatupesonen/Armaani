@@ -5,6 +5,8 @@
 /public/storage
 /storage/*.key
 /storage/pail
+/storage/arma/servers
+/storage/arma/mods
 /vendor
 .env
 .env.backup

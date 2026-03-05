@@ -22,7 +22,7 @@ class ServerProcessService
         $fullCommand = sprintf(
             'nohup %s > %s 2>&1 & echo $! > %s',
             $command,
-            $server->getInstallationPath().'/server.log',
+            $server->getBinaryPath().'/server.log',
             $pidFile
         );
 
@@ -120,7 +120,7 @@ class ServerProcessService
      */
     protected function buildLaunchCommand(Server $server): string
     {
-        $binary = $server->getInstallationPath().'/arma3server_x64';
+        $binary = $server->getBinaryPath().'/arma3server_x64';
         $params = [];
 
         $params[] = '-port='.$server->port;
@@ -165,7 +165,7 @@ class ServerProcessService
 
     protected function startHeadlessClient(Server $server, int $index): void
     {
-        $binary = $server->getInstallationPath().'/arma3server_x64';
+        $binary = $server->getBinaryPath().'/arma3server_x64';
         $pidFile = $this->getHcPidFilePath($server, $index);
 
         $params = [

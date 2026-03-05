@@ -14,11 +14,13 @@ class SteamAccount extends Model
         'username',
         'password',
         'auth_token',
+        'steam_api_key',
     ];
 
     protected $hidden = [
         'password',
         'auth_token',
+        'steam_api_key',
     ];
 
     /**
@@ -29,6 +31,7 @@ class SteamAccount extends Model
         return [
             'password' => 'encrypted',
             'auth_token' => 'encrypted',
+            'steam_api_key' => 'encrypted',
         ];
     }
 }

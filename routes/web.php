@@ -7,9 +7,9 @@ Route::view('/', 'welcome')->name('home');
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::view('dashboard', 'dashboard')->name('dashboard');
 
+    Route::livewire('game-installs', 'pages::game-installs.index')->name('game-installs.index');
+
     Route::livewire('servers', 'pages::servers.index')->name('servers.index');
-    Route::livewire('servers/create', 'pages::servers.create')->name('servers.create');
-    Route::livewire('servers/{server}/edit', 'pages::servers.edit')->name('servers.edit');
 
     Route::livewire('mods', 'pages::mods.index')->name('mods.index');
 

@@ -9,6 +9,7 @@ use App\Services\SteamWorkshopService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Process;
 
 class DownloadModJob implements ShouldQueue
 {
@@ -22,34 +23,61 @@ class DownloadModJob implements ShouldQueue
 
     public function handle(SteamCmdService $steamCmd, SteamWorkshopService $workshop): void
     {
-        Log::info("Starting download of mod {$this->mod->workshop_id}");
+        $context = "[Mod:{$this->mod->id} '{$this->mod->workshop_id}']";
+
+        Log::info("{$context} Starting download");
 
         $this->fetchMetadata($workshop);
 
-        $this->mod->update(['installation_status' => InstallationStatus::Installing]);
+        $this->mod->update([
+            'installation_status' => InstallationStatus::Installing,
+            'progress_pct' => 0,
+        ]);
 
         $installDir = config('arma.mods_base_path');
-        $result = $steamCmd->downloadMod($installDir, $this->mod->workshop_id);
+        $modPath = $this->mod->getInstallationPath();
+        $expectedSize = $this->mod->file_size;
+
+        $process = $steamCmd->startDownloadMod($installDir, $this->mod->workshop_id);
+
+        $lastProgressUpdate = -1;
+
+        while ($process->running()) {
+            sleep(2);
+
+            if ($expectedSize && $expectedSize > 0) {
+                $currentSize = $this->getDirectorySize($modPath);
+                $pct = min(99, (int) round(($currentSize / $expectedSize) * 100));
+
+                if ($pct >= $lastProgressUpdate + 2) {
+                    $lastProgressUpdate = $pct;
+                    $this->mod->updateQuietly(['progress_pct' => $pct]);
+                }
+            }
+        }
+
+        $result = $process->wait();
 
         if ($result->successful()) {
-            $actualSize = $workshop->getDownloadedSize($this->mod->workshop_id);
+            $actualSize = $this->getDirectorySize($modPath);
 
             $this->mod->update([
                 'installation_status' => InstallationStatus::Installed,
+                'progress_pct' => 100,
                 'installed_at' => now(),
-                'file_size' => $actualSize ?: $this->mod->file_size,
+                'file_size' => $actualSize > 0 ? $actualSize : $this->mod->file_size,
             ]);
 
-            Log::info("Mod '{$this->mod->name}' (ID: {$this->mod->workshop_id}) downloaded successfully");
+            Log::info("{$context} Downloaded successfully (disk: {$actualSize} bytes)");
         } else {
-            Log::error("Failed to download mod {$this->mod->workshop_id}: {$result->errorOutput()}");
+            Log::error("{$context} Download failed: {$result->errorOutput()}");
             $this->mod->update(['installation_status' => InstallationStatus::Failed]);
         }
     }
 
     public function failed(?\Throwable $exception): void
     {
-        Log::error("Mod download job failed for {$this->mod->workshop_id}: {$exception?->getMessage()}");
+        Log::error("[Mod:{$this->mod->id} '{$this->mod->workshop_id}'] Job failed: {$exception?->getMessage()}");
         $this->mod->update(['installation_status' => InstallationStatus::Failed]);
     }
 
@@ -70,5 +98,20 @@ class DownloadModJob implements ShouldQueue
                 'file_size' => $this->mod->file_size ?? $details['file_size'],
             ]));
         }
+    }
+
+    private function getDirectorySize(string $path): int
+    {
+        if (! is_dir($path)) {
+            return 0;
+        }
+
+        $result = Process::run(['du', '-sb', $path]);
+
+        if (! $result->successful()) {
+            return 0;
+        }
+
+        return (int) explode("\t", trim($result->output()))[0];
     }
 }

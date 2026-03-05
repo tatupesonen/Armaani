@@ -20,6 +20,7 @@ class Server extends Model
         'admin_password',
         'description',
         'active_preset_id',
+        'game_install_id',
         'headless_client_count',
         'additional_params',
     ];
@@ -29,11 +30,27 @@ class Server extends Model
         return $this->belongsTo(ModPreset::class, 'active_preset_id');
     }
 
+    public function gameInstall(): BelongsTo
+    {
+        return $this->belongsTo(GameInstall::class);
+    }
+
     /**
      * Get the server installation directory path.
      */
     public function getInstallationPath(): string
     {
         return config('arma.servers_base_path').'/'.$this->id;
+    }
+
+    /**
+     * Get the binary directory — uses the linked game install if set,
+     * otherwise falls back to the server's own install path.
+     */
+    public function getBinaryPath(): string
+    {
+        return $this->gameInstall
+            ? $this->gameInstall->getInstallationPath()
+            : $this->getInstallationPath();
     }
 }

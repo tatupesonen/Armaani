@@ -18,6 +18,7 @@ class SteamAccountFactory extends Factory
             'username' => fake()->userName(),
             'password' => fake()->password(),
             'auth_token' => null,
+            'steam_api_key' => null,
         ];
     }
 
@@ -25,6 +26,13 @@ class SteamAccountFactory extends Factory
     {
         return $this->state(fn (): array => [
             'auth_token' => fake()->regexify('[A-Z0-9]{5}'),
+        ]);
+    }
+
+    public function withApiKey(): static
+    {
+        return $this->state(fn (): array => [
+            'steam_api_key' => fake()->regexify('[A-F0-9]{32}'),
         ]);
     }
 }

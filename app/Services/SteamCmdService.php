@@ -9,15 +9,56 @@ use RuntimeException;
 class SteamCmdService
 {
     /**
-     * Build and run a SteamCMD command to install or update the Arma 3 server.
+     * Build and run a SteamCMD command to install or update the Arma 3 server,
+     * streaming output line-by-line to the given callback.
+     *
+     * The callback receives each output line as a string.
+     *
+     * @param  callable(string): void  $onOutput
      */
-    public function installServer(string $installDir): \Illuminate\Contracts\Process\ProcessResult
+    public function installServer(string $installDir, string $branch = 'public', ?callable $onOutput = null): \Illuminate\Contracts\Process\ProcessResult
     {
         $args = $this->baseArgs($installDir);
-        $args[] = '+app_update '.config('arma.server_app_id').' validate';
+
+        if ($branch !== 'public') {
+            $args[] = '+app_update '.config('arma.server_app_id').' -beta '.$branch.' validate';
+        } else {
+            $args[] = '+app_update '.config('arma.server_app_id').' validate';
+        }
+
         $args[] = '+quit';
 
-        return $this->run($args);
+        if ($onOutput === null) {
+            return $this->run($args);
+        }
+
+        $steamcmdPath = config('arma.steamcmd_path');
+
+        return \Illuminate\Support\Facades\Process::timeout(7200)
+            ->run(array_merge([$steamcmdPath], $args), function (string $type, string $output) use ($onOutput): void {
+                foreach (explode("\n", $output) as $line) {
+                    $line = trim($line);
+                    if ($line !== '') {
+                        $onOutput($line);
+                    }
+                }
+            });
+    }
+
+    /**
+     * Start a SteamCMD workshop mod download asynchronously.
+     * Returns a pending process so the caller can poll while it runs.
+     */
+    public function startDownloadMod(string $installDir, int $workshopId): \Illuminate\Process\InvokedProcess
+    {
+        $args = $this->baseArgs($installDir);
+        $args[] = '+workshop_download_item '.config('arma.game_id').' '.$workshopId.' validate';
+        $args[] = '+quit';
+
+        $steamcmdPath = config('arma.steamcmd_path');
+
+        return \Illuminate\Support\Facades\Process::timeout(3600)
+            ->start(array_merge([$steamcmdPath], $args));
     }
 
     /**

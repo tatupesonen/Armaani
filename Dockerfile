@@ -8,24 +8,30 @@ COPY . .
 RUN npm run build
 
 # ---- Application image ----
-FROM ubuntu:24.04
+# Uses cm2network/steamcmd as base — Debian with SteamCMD pre-installed at /home/steam/steamcmd/steamcmd.sh
+# Following the same pattern as https://github.com/fugasjunior/arma-server-manager
+FROM cm2network/steamcmd AS runtime
+
+USER root
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=UTC
 
-# Install system packages
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Install PHP 8.4, Nginx, Supervisor, and SQLite
+RUN dpkg --add-architecture i386 \
+    && apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
     gnupg \
     lib32gcc-s1 \
     lib32stdc++6 \
+    lsb-release \
     nginx \
-    software-properties-common \
     sqlite3 \
     supervisor \
     unzip \
-    && add-apt-repository ppa:ondrej/php -y \
+    && curl -fsSL https://packages.sury.org/php/apt.gpg | gpg --dearmor -o /usr/share/keyrings/sury-php.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/sury-php.gpg] https://packages.sury.org/php/ $(lsb_release -sc) main" > /etc/apt/sources.list.d/sury-php.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
     php8.4-fpm \
@@ -37,18 +43,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     php8.4-zip \
     php8.4-bcmath \
     php8.4-tokenizer \
-    && apt-get clean \
+    && apt-get clean autoclean \
+    && apt-get autoremove --yes \
     && rm -rf /var/lib/apt/lists/*
-
-# Install SteamCMD
-RUN echo steam steam/question select "I AGREE" | debconf-set-selections \
-    && echo steam steam/license note '' | debconf-set-selections \
-    && dpkg --add-architecture i386 \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends steamcmd \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* \
-    && ln -sf /usr/games/steamcmd /usr/local/bin/steamcmd
 
 # Configure PHP-FPM
 RUN sed -i 's|^listen = .*|listen = /run/php/php-fpm.sock|' /etc/php/8.4/fpm/pool.d/www.conf \
@@ -84,7 +81,8 @@ RUN touch database/database.sqlite \
 RUN mkdir -p /data/servers /data/mods \
     && chown -R www-data:www-data /data
 
-ENV STEAMCMD_PATH=/usr/games/steamcmd
+# SteamCMD is at /home/steam/steamcmd/steamcmd.sh in cm2network image
+ENV STEAMCMD_PATH=/home/steam/steamcmd/steamcmd.sh
 ENV SERVERS_BASE_PATH=/data/servers
 ENV MODS_BASE_PATH=/data/mods
 

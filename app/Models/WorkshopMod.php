@@ -17,6 +17,7 @@ class WorkshopMod extends Model
         'name',
         'file_size',
         'installation_status',
+        'progress_pct',
         'installed_at',
     ];
 
@@ -29,6 +30,7 @@ class WorkshopMod extends Model
             'workshop_id' => 'integer',
             'file_size' => 'integer',
             'installation_status' => InstallationStatus::class,
+            'progress_pct' => 'integer',
             'installed_at' => 'datetime',
         ];
     }

@@ -15,6 +15,9 @@
                     <flux:sidebar.item icon="home" :href="route('dashboard')" :current="request()->routeIs('dashboard')" wire:navigate>
                         {{ __('Dashboard') }}
                     </flux:sidebar.item>
+                    <flux:sidebar.item icon="arrow-down-tray" :href="route('game-installs.index')" :current="request()->routeIs('game-installs.*')" wire:navigate>
+                        {{ __('Game Installs') }}
+                    </flux:sidebar.item>
                     <flux:sidebar.item icon="server" :href="route('servers.index')" :current="request()->routeIs('servers.*')" wire:navigate>
                         {{ __('Servers') }}
                     </flux:sidebar.item>

@@ -281,101 +281,157 @@ Inspired by: https://github.com/fugasjunior/arma-server-manager (Java/Spring Boo
 
 ## Domain Concepts
 
+### Game Installs
+- A `GameInstall` represents a downloaded copy of the Arma 3 dedicated server files (Steam App ID 233780).
+- Multiple installs can exist with different names and branches (public, contact, creatordlc, profiling, performance, legacy).
+- Branches are hardcoded — `GetAppBetas` Steam API requires a Steamworks partner token and returns 403 with a regular key.
+- Each install tracks: `name`, `branch`, `installation_status` (`GameInstallStatus` enum), `progress_pct` (0–100), `disk_size_bytes`, `installed_at`.
+- Installed via `InstallServerJob`, which streams SteamCMD output line-by-line via a callback, parses progress lines, and writes `progress_pct` + `disk_size_bytes` to DB (throttled every 2 percentage points using `updateQuietly`).
+- SteamCMD progress line format: `Update state (0x61) downloading, progress: 44.53 (2397543803 / 5384428737)` — emitted roughly every 2 seconds.
+- On completion, actual disk size is recorded via `du -sb`.
+- All SteamCMD output lines are logged with context prefix: `[GameInstall:1 'stable'] <line>`.
+
 ### Server Instances
-- Multiple Arma 3 server instances can exist, each with its own configuration (name, port, password, max players, etc.)
-- Each server instance can have an active mod preset assigned to it
-- Server files are installed via SteamCMD (Steam App ID 233780 for Arma 3 dedicated server)
-- Servers can be started, stopped, and restarted from the web UI
-- Server configuration is managed through the web UI
+- Each server **must** be linked to a `GameInstall` (`game_install_id` required — no server without one).
+- Configuration is managed inline on the servers index page (expand/collapse panel) — no separate create/edit pages.
+- Each server has: name, port, query_port, max_players, password, admin_password, description, headless_client_count, additional_params, active_preset_id, game_install_id.
+- Port uniqueness is validated across both `port` and `query_port` columns for all servers.
+- Servers can be started, stopped, and restarted from the web UI.
+- `Server::getBinaryPath()` derives the server binary path from the linked `GameInstall`.
 
 ### Workshop Mods
-- Mods are identified by their Steam Workshop ID (numeric)
-- Mods are downloaded using SteamCMD as queued Laravel jobs (one job per mod)
-- Each mod has an installation status: Queued, Installing, Installed, Failed
-- Mod metadata (name, file size) can be fetched from the Steam Workshop API
-- Downloaded mod files need to be converted to lowercase (Linux requirement for Arma 3)
-- Mods are symlinked into server directories when assigned
+- Mods are identified by their Steam Workshop ID (numeric).
+- Mods are downloaded using SteamCMD as queued Laravel jobs (one job per mod, `DownloadModJob`).
+- Each mod has: `workshop_id`, `name`, `file_size`, `installation_status` (`InstallationStatus` enum), `progress_pct` (0–100), `installed_at`.
+- **Progress tracking**: SteamCMD does NOT output progress lines for workshop downloads. Progress is tracked by polling `du -sb` on the mod directory in a loop while the SteamCMD process runs asynchronously (`Process::start()` + `while ($process->running())`). `progress_pct` is written to DB (throttled every 2%) using `updateQuietly`. The UI reads `progress_pct` directly from the model — no UI-side `du` calls.
+- Mod metadata (name, file size) is fetched from the Steam Workshop API before download begins.
+- On completion, actual disk size is recorded via `du -sb` on the mod directory.
+- Mod files need to be converted to lowercase (Linux requirement for Arma 3).
+- Mods are symlinked into server directories when assigned via presets.
 
 ### Mod Presets
-- A preset is a named collection of workshop mods
-- Presets can be created manually (selecting individual mods) or by importing an Arma 3 Launcher HTML preset file
-- When importing an HTML preset, the system parses mod IDs from the file and queues individual download jobs for each mod
-- A server instance uses one active preset at a time
-- Presets can be shared across multiple server instances
+- A preset is a named collection of workshop mods.
+- Presets can be created manually (selecting individual mods) or by importing an Arma 3 Launcher HTML preset file.
+- When importing an HTML preset, the system parses mod IDs from the file and queues individual download jobs for each mod.
+- A server instance uses one active preset at a time.
+- Presets can be shared across multiple server instances.
 
 ### Headless Clients
-- Each Arma 3 server instance can have headless clients launched alongside it
-- Headless clients offload AI processing from the main server
-- They connect to the server automatically using the server's configured password
-- Users can start/stop headless clients per server from the UI
+- Each Arma 3 server instance can have headless clients launched alongside it.
+- Headless clients offload AI processing from the main server.
+- They connect to the server automatically using the server's configured password.
+- Users can start/stop headless clients per server from the UI.
 
 ### SteamCMD Integration
-- SteamCMD is the command-line tool used to download server files and workshop mods
-- SteamCMD commands are executed as queued jobs to prevent blocking the web UI
-- Steam credentials (username, encrypted password, Steam Guard token) are managed via a settings page in the web UI and stored encrypted in the database
-- The settings page must validate that credentials work before saving them
-- The SteamCMD binary path is configurable via environment variable
+- SteamCMD is the command-line tool used to download server files and workshop mods.
+- SteamCMD commands are executed as queued jobs to prevent blocking the web UI.
+- Steam credentials (username, encrypted password) are managed via a settings page and stored encrypted in the database (`SteamAccount` model).
+- The SteamCMD binary path is configurable via `STEAMCMD_PATH` env var (default: `/usr/games/steamcmd`).
 - Arma 3 server Steam App ID: 233780
 - Arma 3 game ID (for workshop mods): 107410
+- `SteamCmdService::installServer()` accepts an optional `?callable $onOutput` and streams output line-by-line.
+- `SteamCmdService::startDownloadMod()` starts the process asynchronously and returns an `InvokedProcess` for polling.
+- `SteamCmdService::downloadMod()` (sync, no callback) still exists but is not used by the job.
 
 ## Architecture Decisions
 
 ### Queue-Based Downloads
-- All SteamCMD operations (server install, mod download, mod update) run as queued Laravel jobs
-- Each mod download is a separate job so progress can be tracked individually
-- The queue worker should process one job at a time to avoid SteamCMD conflicts (SteamCMD can only run one instance at a time)
-- Use the `database` queue driver (already configured)
+- All SteamCMD operations run as queued Laravel jobs.
+- Each mod download is a separate job so progress can be tracked individually.
+- The queue worker processes one job at a time to avoid SteamCMD conflicts.
+- Uses the `database` queue driver (already configured).
 
 ### Real-Time Updates
-- Use Livewire polling (`wire:poll`) to show real-time status updates for mod downloads, server status, etc.
-- No WebSocket/broadcasting infrastructure needed
+- `wire:poll.5s` for server status and game install status.
+- `wire:poll.2s` for mod download progress.
+- No WebSocket/broadcasting infrastructure needed.
+- Progress (`progress_pct`) is written by the job to the DB; the UI reads it directly from the model on each poll.
+
+### Livewire Components
+- Single-file Livewire components in `resources/views/pages/` using the `pages::` namespace.
+- No `⚡` emoji prefixes on filenames (`livewire.php` has `make_command.emoji => false`).
+- Server create/edit is inline on the servers index page (modal for create, expand panel for edit) — no separate pages.
+- `flux:select` with a bound integer property: pre-initialise the property in the open method (e.g. `$this->gameInstalls->first()?->id`) to avoid the flux:select null-on-no-interaction bug.
 
 ### File System Layout
-- Server files: `{SERVERS_BASE_PATH}/{server_id}/`
-- Workshop mods: `{MODS_BASE_PATH}/steamapps/workshop/content/107410/{mod_id}/`
+- Game install files: `{SERVERS_BASE_PATH}/{game_install_id}/`
+- Workshop mods: `{MODS_BASE_PATH}/steamapps/workshop/content/107410/{workshop_id}/`
 - Mod symlinks into server dirs: `{server_path}/@{normalized_mod_name}`
-- All paths are configurable via environment variables
+- All paths are configurable via environment variables.
 
 ### Docker Deployment
-- The application ships as a single Docker container
-- The container includes: PHP-FPM, Nginx, SteamCMD, Node.js (for asset building), SQLite
-- Supervisord manages Nginx, PHP-FPM, and the Laravel queue worker within the single container
-- Storage volumes for: database, server files, mod files, Laravel storage
-- A `docker-compose.yml` is provided for easy deployment
+- The application ships as a single Docker container.
+- The container includes: PHP-FPM, Nginx, SteamCMD, Node.js (for asset building), SQLite.
+- Supervisord manages Nginx, PHP-FPM, and the Laravel queue worker.
+- Storage volumes for: database, server files, mod files, Laravel storage.
+- A `docker-compose.yml` is provided for easy deployment.
+- `storage/arma/servers` and `storage/arma/mods` are gitignored.
 
 ### Environment Variables (Custom)
 - `STEAMCMD_PATH` - Path to SteamCMD executable (default: `/usr/games/steamcmd`)
 - `STEAM_API_KEY` - Steam Web API key for fetching workshop mod metadata
-- `SERVERS_BASE_PATH` - Base directory for server installations
+- `SERVERS_BASE_PATH` - Base directory for game install downloads
 - `MODS_BASE_PATH` - Base directory for mod downloads
 
 ## Data Model
 
 ### Core Models
-- `Server` - Arma 3 server instance (name, port, query_port, max_players, password, admin_password, description, active_preset_id)
-- `WorkshopMod` - A Steam Workshop mod (workshop_id, name, file_size, installation_status, installed_at)
+- `GameInstall` - A downloaded Arma 3 server installation (name, branch, installation_status, progress_pct, disk_size_bytes, installed_at)
+- `Server` - Arma 3 server instance (name, port, query_port, max_players, password, admin_password, description, active_preset_id, game_install_id, headless_client_count, additional_params)
+- `WorkshopMod` - A Steam Workshop mod (workshop_id, name, file_size, installation_status, progress_pct, installed_at)
 - `ModPreset` - A named collection of mods (name)
-- `ModPresetMod` - Pivot table (mod_preset_id, workshop_mod_id)
-- `SteamAccount` - Steam credentials for SteamCMD (username, encrypted password, auth_token) -- managed via web UI settings page
+- `mod_preset_workshop_mod` - Pivot table (mod_preset_id, workshop_mod_id)
+- `SteamAccount` - Steam credentials for SteamCMD (username, encrypted password)
 
 ### Enums
-- `InstallationStatus` - Queued, Installing, Installed, Failed
+- `InstallationStatus` - Queued, Installing, Installed, Failed (used by `WorkshopMod`)
+- `GameInstallStatus` - Queued, Installing, Installed, Failed (used by `GameInstall`)
 - `ServerStatus` - Stopped, Starting, Running, Stopping
+
+## Key Files
+
+### Models
+- `app/Models/GameInstall.php` — `getInstallationPath()` returns the install dir
+- `app/Models/Server.php` — `gameInstall(): BelongsTo`, `getBinaryPath(): string`
+- `app/Models/WorkshopMod.php` — `getInstallationPath(): string`, `getNormalizedName(): string`
+
+### Services
+- `app/Services/SteamCmdService.php` — `installServer(dir, branch, ?callable)`, `startDownloadMod(dir, id): InvokedProcess`, `downloadMod(dir, id): ProcessResult`, `validateCredentials(user, pass): bool`
+- `app/Services/SteamWorkshopService.php` — `getModDetails(id): ?array`, `validateApiKey(key): array`, `getApiKey(): ?string`
+- `app/Services/ServerProcessService.php` — start/stop/restart server processes, uses `getBinaryPath()`
+
+### Jobs
+- `app/Jobs/InstallServerJob.php` — installs a `GameInstall`; streams SteamCMD output; parses `progress:` lines; throttled DB writes
+- `app/Jobs/DownloadModJob.php` — downloads a `WorkshopMod`; uses `startDownloadMod()` (async); polls `du -sb` every 2s; throttled DB writes
+
+### Pages (Livewire single-file)
+- `resources/views/pages/game-installs/index.blade.php` — game installs list, create modal, reinstall/delete, `wire:poll.5s`
+- `resources/views/pages/servers/index.blade.php` — server list with inline create modal + configure panel, game install dropdown (required), `wire:poll.5s`
+- `resources/views/pages/mods/index.blade.php` — mod list, add by workshop ID, progress bar from `$mod->progress_pct`, `wire:poll.2s`
+
+### Tests
+- `tests/Feature/GameInstalls/GameInstallManagementTest.php`
+- `tests/Feature/Servers/ServerManagementTest.php`
+- `tests/Feature/Mods/WorkshopModManagementTest.php`
+- `tests/Feature/Jobs/DownloadModJobTest.php` — mocks `SteamCmdService::startDownloadMod()` returning a mock `InvokedProcess`; uses `Process::fake(['du *' => ...])` for disk size
 
 ## SteamCMD Commands Reference
 
 ### Install/Update Arma 3 Server
 ```
-steamcmd +force_install_dir {server_path} +login {username} {password} +app_update 233780 validate +quit
+steamcmd +force_install_dir {install_path} +login {username} {password} +app_update 233780 validate +quit
+# For non-public branch:
+steamcmd +force_install_dir {install_path} +login {username} {password} +app_update 233780 -beta {branch} validate +quit
 ```
 
 ### Download Workshop Mod
 ```
-steamcmd +force_install_dir {mods_path} +login {username} {password} +workshop_download_item 107410 {workshop_id} validate +quit
+steamcmd +force_install_dir {mods_base_path} +login {username} {password} +workshop_download_item 107410 {workshop_id} validate +quit
 ```
 
-## Testing Strategy
-- Mock SteamCMD execution in tests (use a service class that wraps Process calls)
-- Use factories for Server, WorkshopMod, ModPreset models
-- Feature tests for Livewire components (mod installation flow, preset management, server configuration)
-- Unit tests for SteamCMD command building, HTML preset parsing, mod path normalization
+## Testing Notes
+- Mock `SteamCmdService` directly in job tests (bind via `$this->app->instance()`).
+- For `DownloadModJob` tests: mock `startDownloadMod()` to return a mock `InvokedProcess` with `running()` returning `false` and `wait()` returning a mock `ProcessResult`. Use `Process::fake(['du *' => Process::result('SIZE\t/path')])` to fake disk size reads.
+- For `InstallServerJob` tests: mock `installServer()` to invoke the callback with fake output lines if testing progress parsing.
+- `setUp()` in `ServerManagementTest` always creates a `GameInstall` — tests that need `createGameInstallId` to be null must explicitly `->set('createGameInstallId', null)` after `openCreateModal`.
+- `SteamWorkshopService` no longer has `getDownloadProgress()` or `getDownloadedSize()` — do not mock them.
