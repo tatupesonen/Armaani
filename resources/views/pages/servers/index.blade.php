@@ -638,7 +638,7 @@ new #[Title('Servers')] class extends Component
                             wire:key="server-logs-{{ $server->id }}"
                         >
                             <flux:text class="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-2">{{ __('Server Log') }}</flux:text>
-                            <div class="rounded bg-zinc-900 text-zinc-100 p-3 font-mono text-xs max-h-64 overflow-y-auto" x-ref="logContainer">
+                            <div class="rounded bg-zinc-900 text-zinc-100 p-3 font-mono text-xs max-h-[32rem] overflow-y-auto" x-ref="logContainer">
                                 <template x-if="lines.length === 0">
                                     <div class="text-zinc-500">{{ __('Waiting for output...') }}</div>
                                 </template>

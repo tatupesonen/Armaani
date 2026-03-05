@@ -205,10 +205,8 @@ class ServerProcessService
         $params[] = '-skipIntro';
         $params[] = '-world=empty';
 
-        $modParams = $this->buildModParams($server);
-
-        if ($modParams) {
-            $params[] = '-mod='.$modParams;
+        foreach ($this->getModNames($server) as $modName) {
+            $params[] = '-mod='.$modName;
         }
 
         if ($server->additional_params) {
@@ -219,17 +217,19 @@ class ServerProcessService
     }
 
     /**
-     * Build the -mod= parameter string from the server's active preset.
+     * Get the list of normalized mod directory names from the server's active preset.
+     *
+     * @return array<int, string>
      */
-    protected function buildModParams(Server $server): string
+    protected function getModNames(Server $server): array
     {
         $preset = $server->activePreset;
 
         if (! $preset) {
-            return '';
+            return [];
         }
 
-        return $preset->mods->map(fn ($mod) => $mod->getNormalizedName())->implode(';');
+        return $preset->mods->map(fn ($mod) => $mod->getNormalizedName())->all();
     }
 
     /**
@@ -566,10 +566,8 @@ class ServerProcessService
             $params[] = '-password='.$server->password;
         }
 
-        $modParams = $this->buildModParams($server);
-
-        if ($modParams) {
-            $params[] = '-mod='.$modParams;
+        foreach ($this->getModNames($server) as $modName) {
+            $params[] = '-mod='.$modName;
         }
 
         Log::info("{$context} Starting headless client");
