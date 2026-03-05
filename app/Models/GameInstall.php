@@ -38,6 +38,6 @@ class GameInstall extends Model
      */
     public function getInstallationPath(): string
     {
-        return config('arma.servers_base_path').'/game/'.$this->id;
+        return config('arma.games_base_path').'/'.$this->id;
     }
 }

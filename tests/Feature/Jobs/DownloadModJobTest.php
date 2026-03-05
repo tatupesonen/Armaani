@@ -214,6 +214,44 @@ class DownloadModJobTest extends TestCase
         });
     }
 
+    public function test_successful_download_converts_mod_files_to_lowercase(): void
+    {
+        $mod = WorkshopMod::factory()->create([
+            'name' => 'Case Test Mod',
+            'file_size' => 10000000,
+            'installation_status' => InstallationStatus::Queued,
+        ]);
+
+        // Create fake mod directory with mixed-case files
+        $modPath = $mod->getInstallationPath();
+        $addonsDir = $modPath.'/Addons';
+        @mkdir($addonsDir, 0755, true);
+        file_put_contents($addonsDir.'/MyAddon.pbo', 'fake');
+        file_put_contents($modPath.'/Mod.cpp', 'fake');
+
+        Process::fake(['du *' => Process::result('10000000	/fake/path')]);
+
+        $steamCmd = Mockery::mock(SteamCmdService::class);
+        $steamCmd->shouldReceive('startDownloadMod')->once()->andReturn($this->makeInvokedProcess(true));
+
+        $workshop = Mockery::mock(SteamWorkshopService::class);
+
+        $this->app->instance(SteamCmdService::class, $steamCmd);
+        $this->app->instance(SteamWorkshopService::class, $workshop);
+
+        $job = new DownloadModJob($mod);
+        $job->handle($steamCmd, $workshop);
+
+        // Verify files were converted to lowercase
+        $this->assertFileExists($modPath.'/addons/myaddon.pbo');
+        $this->assertFileExists($modPath.'/mod.cpp');
+        $this->assertFileDoesNotExist($modPath.'/Addons/MyAddon.pbo');
+        $this->assertFileDoesNotExist($modPath.'/Mod.cpp');
+
+        // Cleanup
+        $this->recursiveDeleteDir($modPath);
+    }
+
     /**
      * Build a mock InvokedProcess that finishes immediately with the given exit status.
      */
@@ -229,5 +267,27 @@ class DownloadModJobTest extends TestCase
         $invokedProcess->shouldReceive('wait')->andReturn($processResult);
 
         return $invokedProcess;
+    }
+
+    private function recursiveDeleteDir(string $path): void
+    {
+        if (! is_dir($path)) {
+            return;
+        }
+
+        $items = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($path, \RecursiveDirectoryIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::CHILD_FIRST
+        );
+
+        foreach ($items as $item) {
+            if ($item->isFile() || is_link($item->getPathname())) {
+                @unlink($item->getPathname());
+            } elseif ($item->isDir()) {
+                @rmdir($item->getPathname());
+            }
+        }
+
+        @rmdir($path);
     }
 }

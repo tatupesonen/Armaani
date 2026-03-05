@@ -77,12 +77,13 @@ RUN chown -R www-data:www-data storage bootstrap/cache \
 RUN touch database/database.sqlite \
     && chown www-data:www-data database/database.sqlite
 
-# Storage directories for server files and mods
-RUN mkdir -p /data/servers /data/mods \
+# Storage directories for game installs, server profiles, and mods
+RUN mkdir -p /data/games /data/servers /data/mods \
     && chown -R www-data:www-data /data
 
 # SteamCMD is at /home/steam/steamcmd/steamcmd.sh in cm2network image
 ENV STEAMCMD_PATH=/home/steam/steamcmd/steamcmd.sh
+ENV GAMES_BASE_PATH=/data/games
 ENV SERVERS_BASE_PATH=/data/servers
 ENV MODS_BASE_PATH=/data/mods
 

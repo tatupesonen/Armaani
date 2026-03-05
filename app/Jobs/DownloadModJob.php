@@ -78,6 +78,8 @@ class DownloadModJob implements ShouldQueue
         }
 
         if ($result->successful()) {
+            $this->convertToLowercase($modPath);
+
             $actualSize = $this->getDirectorySize($modPath);
 
             $this->mod->update([
@@ -120,6 +122,31 @@ class DownloadModJob implements ShouldQueue
                 'name' => $this->mod->name ?? $details['name'],
                 'file_size' => $this->mod->file_size ?? $details['file_size'],
             ]));
+        }
+    }
+
+    /**
+     * Recursively convert all file and directory names to lowercase.
+     * Required for Arma 3 on Linux where filenames are case-sensitive.
+     */
+    private function convertToLowercase(string $path): void
+    {
+        if (! is_dir($path)) {
+            return;
+        }
+
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($path, \RecursiveDirectoryIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::CHILD_FIRST
+        );
+
+        foreach ($iterator as $item) {
+            $lowercaseName = strtolower($item->getFilename());
+
+            if ($item->getFilename() !== $lowercaseName) {
+                $newPath = $item->getPath().'/'.$lowercaseName;
+                rename($item->getPathname(), $newPath);
+            }
         }
     }
 

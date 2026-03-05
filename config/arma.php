@@ -28,11 +28,23 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Games Base Path
+    |--------------------------------------------------------------------------
+    |
+    | The base directory where Arma 3 game installations are stored.
+    | Each game install gets its own subdirectory: {base_path}/{game_install_id}/
+    |
+    */
+
+    'games_base_path' => env('GAMES_BASE_PATH', storage_path('arma/games')),
+
+    /*
+    |--------------------------------------------------------------------------
     | Servers Base Path
     |--------------------------------------------------------------------------
     |
-    | The base directory where Arma 3 server installations are stored.
-    | Each server instance gets its own subdirectory: {base_path}/{server_id}/
+    | The base directory where Arma 3 server instance data is stored.
+    | Each server gets its own subdirectory: {base_path}/{server_id}/
     |
     */
 

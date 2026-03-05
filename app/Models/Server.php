@@ -36,26 +36,16 @@ class Server extends Model
     }
 
     /**
-     * Get the server installation directory path.
+     * Get the per-server profiles directory path.
+     * Arma 3 stores .vars profiles, RPT logs, bans, and config here.
      */
-    public function getInstallationPath(): string
+    public function getProfilesPath(): string
     {
         return config('arma.servers_base_path').'/'.$this->id;
     }
 
-    /**
-     * Get the per-server profiles directory path.
-     * Arma 3 stores RPT logs, bans, player profiles, and config here.
-     */
-    public function getProfilesPath(): string
-    {
-        return $this->getInstallationPath().'/profiles';
-    }
-
     public function getBinaryPath(): string
     {
-        return $this->gameInstall
-            ? $this->gameInstall->getInstallationPath()
-            : $this->getInstallationPath();
+        return $this->gameInstall->getInstallationPath();
     }
 }

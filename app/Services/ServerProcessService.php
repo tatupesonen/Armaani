@@ -27,8 +27,10 @@ class ServerProcessService
             mkdir($profilesPath, 0755, true);
         }
 
-        $this->generateServerConfig($server);
+        $this->symlinkMods($server);
         $this->symlinkMissions($server);
+        $this->copyBiKeys($server);
+        $this->generateServerConfig($server);
 
         $command = $this->buildLaunchCommand($server);
         $pidFile = $this->getPidFilePath($server);
@@ -252,6 +254,28 @@ class ServerProcessService
             $lines[] = '};';
         }
 
+        $mpmissionsPath = $server->getBinaryPath().'/mpmissions';
+        $missionFiles = is_dir($mpmissionsPath)
+            ? glob($mpmissionsPath.'/*.pbo') ?: []
+            : [];
+
+        if (! empty($missionFiles)) {
+            $lines[] = '';
+            $lines[] = '// MISSIONS';
+            $lines[] = 'class Missions {';
+
+            foreach ($missionFiles as $index => $missionFile) {
+                $template = basename($missionFile, '.pbo');
+                $classIndex = $index + 1;
+                $lines[] = "    class Mission{$classIndex} {";
+                $lines[] = '        template = "'.addslashes($template).'";';
+                $lines[] = '        difficulty = "Regular";';
+                $lines[] = '    };';
+            }
+
+            $lines[] = '};';
+        }
+
         file_put_contents(
             $server->getProfilesPath().'/server.cfg',
             implode("\n", $lines)."\n"
@@ -287,6 +311,107 @@ class ServerProcessService
             $linkPath = $mpmissionsPath.'/'.basename($pboFile);
             symlink($pboFile, $linkPath);
         }
+    }
+
+    /**
+     * Create symlinks for all mods in the active preset into the game install directory.
+     * Each mod is symlinked as {game_install_dir}/@NormalizedName -> {mod_download_path}.
+     */
+    protected function symlinkMods(Server $server): void
+    {
+        $preset = $server->activePreset;
+
+        if (! $preset) {
+            return;
+        }
+
+        $gameInstallPath = $server->getBinaryPath();
+
+        // Remove existing mod symlinks (anything starting with @)
+        $existingLinks = glob($gameInstallPath.'/@*') ?: [];
+        foreach ($existingLinks as $link) {
+            if (is_link($link)) {
+                unlink($link);
+            }
+        }
+
+        $preset->load('mods');
+
+        foreach ($preset->mods as $mod) {
+            $modInstallPath = $mod->getInstallationPath();
+
+            if (! is_dir($modInstallPath)) {
+                Log::warning("[Server:{$server->id}] Mod '{$mod->name}' (ID {$mod->id}) directory not found at {$modInstallPath}, skipping symlink");
+
+                continue;
+            }
+
+            $linkPath = $gameInstallPath.'/'.$mod->getNormalizedName();
+
+            if (! file_exists($linkPath)) {
+                symlink($modInstallPath, $linkPath);
+                Log::info("[Server:{$server->id}] Symlinked mod {$mod->getNormalizedName()} -> {$modInstallPath}");
+            }
+        }
+    }
+
+    /**
+     * Copy .bikey files from all mods in the active preset to the game install's keys/ directory.
+     * BiKeys are required for signature verification (verifySignatures=2).
+     */
+    protected function copyBiKeys(Server $server): void
+    {
+        $preset = $server->activePreset;
+
+        if (! $preset) {
+            return;
+        }
+
+        $keysPath = $server->getBinaryPath().'/keys';
+
+        if (! is_dir($keysPath)) {
+            mkdir($keysPath, 0755, true);
+        }
+
+        $preset->load('mods');
+
+        foreach ($preset->mods as $mod) {
+            $modInstallPath = $mod->getInstallationPath();
+
+            if (! is_dir($modInstallPath)) {
+                continue;
+            }
+
+            $bikeyFiles = $this->findBiKeyFiles($modInstallPath);
+
+            foreach ($bikeyFiles as $bikeyFile) {
+                $destPath = $keysPath.'/'.basename($bikeyFile);
+                copy($bikeyFile, $destPath);
+                Log::info("[Server:{$server->id}] Copied BiKey ".basename($bikeyFile)." from mod '{$mod->name}'");
+            }
+        }
+    }
+
+    /**
+     * Recursively find all .bikey files in a directory.
+     *
+     * @return array<string>
+     */
+    protected function findBiKeyFiles(string $directory): array
+    {
+        $bikeyFiles = [];
+
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($directory, \RecursiveDirectoryIterator::SKIP_DOTS),
+        );
+
+        foreach ($iterator as $file) {
+            if ($file->isFile() && strtolower($file->getExtension()) === 'bikey') {
+                $bikeyFiles[] = $file->getPathname();
+            }
+        }
+
+        return $bikeyFiles;
     }
 
     protected function startHeadlessClient(Server $server, int $index): void
