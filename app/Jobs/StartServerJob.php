@@ -15,8 +15,6 @@ class StartServerJob implements ShouldQueue
 
     public int $tries = 1;
 
-    public int $timeout = 120;
-
     public function __construct(public Server $server, public bool $restart = false) {}
 
     public function handle(ServerProcessService $service): void

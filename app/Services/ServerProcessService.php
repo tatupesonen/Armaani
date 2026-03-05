@@ -50,20 +50,25 @@ class ServerProcessService
         // TODO: Re-enable log tailing once it no longer freezes `composer run dev`.
         // $this->startLogTail($server);
 
-        $fullCommand = sprintf(
-            'cd %s && nohup %s > %s 2>&1 & echo $! > %s',
-            escapeshellarg($binaryDir),
-            $command,
-            escapeshellarg($logFile),
-            escapeshellarg($pidFile)
-        );
+        // Start the server as a detached child process using proc_open.
+        // The 'exec' prefix replaces the shell with the server binary so
+        // the PID we capture IS the server process — signals target it directly.
+        $descriptors = [
+            0 => ['file', '/dev/null', 'r'],
+            1 => ['file', $logFile, 'a'],
+            2 => ['file', $logFile, 'a'],
+        ];
 
-        // Wrap in subshell with output suppressed so the arma3server process
-        // does not inherit PHP's exec() pipe fd, which would block forever.
-        exec('('.$fullCommand.') > /dev/null 2>&1');
+        $process = proc_open('exec '.$command, $descriptors, $pipes, $binaryDir);
 
-        $pid = $this->getPid($server);
-        Log::info("{$context} Process started with PID {$pid}");
+        if (is_resource($process)) {
+            $status = proc_get_status($process);
+            $pid = $status['pid'];
+            file_put_contents($pidFile, (string) $pid);
+            Log::info("{$context} Process started with PID {$pid}");
+        } else {
+            Log::error("{$context} Failed to start server process");
+        }
     }
 
     /**
