@@ -149,43 +149,124 @@ class ServerProcessService
     }
 
     /**
-     * Start headless clients for the server.
+     * Add a single headless client to a running server.
+     * Returns the index assigned to the new HC, or null if the cap is reached.
      */
-    public function startHeadlessClients(Server $server): void
+    public function addHeadlessClient(Server $server): ?int
     {
-        $count = $server->headless_client_count;
+        $runningIndices = $this->getRunningHcIndices($server);
 
-        if ($count > 0) {
-            Log::info("[Server:{$server->id} '{$server->name}'] Starting {$count} headless client(s)");
+        if (count($runningIndices) >= 10) {
+            Log::warning("[Server:{$server->id} '{$server->name}'] Cannot add HC — already at maximum (10)");
+
+            return null;
         }
 
-        for ($i = 0; $i < $count; $i++) {
-            $this->startHeadlessClient($server, $i);
+        $nextIndex = $runningIndices === [] ? 0 : max($runningIndices) + 1;
+
+        $server->load('activePreset.mods');
+        $this->startHeadlessClient($server, $nextIndex);
+
+        return $nextIndex;
+    }
+
+    /**
+     * Remove the most recently added headless client (highest index).
+     * Returns the index removed, or null if none are running.
+     */
+    public function removeHeadlessClient(Server $server): ?int
+    {
+        $runningIndices = $this->getRunningHcIndices($server);
+
+        if ($runningIndices === []) {
+            return null;
+        }
+
+        $index = max($runningIndices);
+        $this->stopHeadlessClient($server, $index);
+
+        return $index;
+    }
+
+    /**
+     * Stop all running headless clients for a server.
+     * Globs PID files so it catches all HCs regardless of expected count.
+     */
+    public function stopAllHeadlessClients(Server $server): void
+    {
+        $context = "[Server:{$server->id} '{$server->name}']";
+        $pidFiles = glob(storage_path('app/server_'.$server->id.'_hc_*.pid')) ?: [];
+
+        foreach ($pidFiles as $pidFile) {
+            $pid = (int) trim(file_get_contents($pidFile));
+
+            if ($pid > 0 && $this->isProcessRunning($pid)) {
+                Log::info("{$context} Stopping headless client (PID {$pid})");
+                posix_kill($pid, SIGTERM);
+            }
+
+            @unlink($pidFile);
         }
     }
 
     /**
-     * Stop all headless clients for a server.
+     * Get the number of currently running headless clients.
+     * Cleans up stale PID files for crashed HCs as a side effect.
      */
-    public function stopHeadlessClients(Server $server): void
+    public function getRunningHeadlessClientCount(Server $server): int
     {
-        $context = "[Server:{$server->id} '{$server->name}']";
-        $count = $server->headless_client_count;
+        return count($this->getRunningHcIndices($server));
+    }
 
-        for ($i = 0; $i < $count; $i++) {
-            $pidFile = $this->getHcPidFilePath($server, $i);
+    /**
+     * Get sorted indices of all running headless clients.
+     * Removes stale PID files (crashed HCs) as a side effect.
+     *
+     * @return int[]
+     */
+    protected function getRunningHcIndices(Server $server): array
+    {
+        $pidFiles = glob(storage_path('app/server_'.$server->id.'_hc_*.pid')) ?: [];
+        $runningIndices = [];
 
-            if (file_exists($pidFile)) {
-                $pid = (int) file_get_contents($pidFile);
+        foreach ($pidFiles as $pidFile) {
+            $pid = (int) trim(file_get_contents($pidFile));
 
-                if ($this->isProcessRunning($pid)) {
-                    Log::info("{$context} Stopping headless client {$i} (PID {$pid})");
-                    posix_kill($pid, SIGTERM);
+            if ($pid > 0 && $this->isProcessRunning($pid)) {
+                // Extract index from filename: server_{id}_hc_{index}.pid
+                if (preg_match('/hc_(\d+)\.pid$/', $pidFile, $matches)) {
+                    $runningIndices[] = (int) $matches[1];
                 }
-
+            } else {
                 @unlink($pidFile);
             }
         }
+
+        sort($runningIndices);
+
+        return $runningIndices;
+    }
+
+    /**
+     * Stop a single headless client by index.
+     */
+    protected function stopHeadlessClient(Server $server, int $index): void
+    {
+        $context = "[Server:{$server->id} '{$server->name}' HC:{$index}]";
+        $pidFile = $this->getHcPidFilePath($server, $index);
+
+        if (! file_exists($pidFile)) {
+            return;
+        }
+
+        $pid = (int) trim(file_get_contents($pidFile));
+
+        if ($pid > 0 && $this->isProcessRunning($pid)) {
+            Log::info("{$context} Stopping headless client (PID {$pid})");
+            posix_kill($pid, SIGTERM);
+        }
+
+        @unlink($pidFile);
     }
 
     /**
@@ -263,6 +344,10 @@ class ServerProcessService
         $lines[] = 'onUnsignedData = "kick (_this select 0)";';
         $lines[] = 'onHackedData = "kick (_this select 0)";';
         $lines[] = 'onDifferentData = "";';
+        $lines[] = '';
+        $lines[] = '// HEADLESS CLIENT';
+        $lines[] = 'headlessClients[] = {"127.0.0.1"};';
+        $lines[] = 'localClient[] = {"127.0.0.1"};';
 
         if ($server->description) {
             $lines[] = '';
@@ -570,20 +655,27 @@ class ServerProcessService
             $params[] = '-mod='.$modName;
         }
 
-        Log::info("{$context} Starting headless client");
+        $command = $binary.' '.implode(' ', $params);
+        Log::info("{$context} Starting headless client: {$command}");
 
-        $command = sprintf(
-            'cd %s && nohup %s %s > %s 2>&1 & echo $! > %s',
-            escapeshellarg($binaryDir),
-            $binary,
-            implode(' ', $params),
-            escapeshellarg($logFile),
-            escapeshellarg($pidFile)
-        );
+        file_put_contents($logFile, '');
 
-        exec($command);
+        $descriptors = [
+            0 => ['file', '/dev/null', 'r'],
+            1 => ['file', $logFile, 'a'],
+            2 => ['file', $logFile, 'a'],
+        ];
 
-        Log::info("{$context} Headless client started");
+        $process = proc_open('exec '.$command, $descriptors, $pipes, $binaryDir);
+
+        if (is_resource($process)) {
+            $status = proc_get_status($process);
+            $pid = $status['pid'];
+            file_put_contents($pidFile, (string) $pid);
+            Log::info("{$context} Headless client started with PID {$pid}");
+        } else {
+            Log::error("{$context} Failed to start headless client");
+        }
     }
 
     protected function getPid(Server $server): ?int

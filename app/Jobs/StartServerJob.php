@@ -20,9 +20,12 @@ class StartServerJob implements ShouldQueue
     public function handle(ServerProcessService $service): void
     {
         $context = "[Server:{$this->server->id} '{$this->server->name}']";
+        $hcCount = 0;
 
         if ($this->restart) {
-            Log::info("{$context} Restarting server (stop phase)");
+            $hcCount = $service->getRunningHeadlessClientCount($this->server);
+            Log::info("{$context} Restarting server (stop phase, {$hcCount} HC(s) to restore)");
+            $service->stopAllHeadlessClients($this->server);
             $service->stop($this->server);
             sleep(2);
         }
@@ -33,6 +36,13 @@ class StartServerJob implements ShouldQueue
         if ($service->isRunning($this->server)) {
             $this->server->update(['status' => ServerStatus::Running]);
             Log::info("{$context} Server started successfully");
+
+            if ($this->restart && $hcCount > 0) {
+                Log::info("{$context} Restoring {$hcCount} headless client(s)");
+                for ($i = 0; $i < $hcCount; $i++) {
+                    $service->addHeadlessClient($this->server);
+                }
+            }
         } else {
             $this->server->update(['status' => ServerStatus::Stopped]);
             Log::error("{$context} Server failed to start");

@@ -24,7 +24,6 @@ class Server extends Model
         'active_preset_id',
         'game_install_id',
         'status',
-        'headless_client_count',
         'additional_params',
         'verify_signatures',
         'allowed_file_patching',

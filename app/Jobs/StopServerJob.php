@@ -24,6 +24,7 @@ class StopServerJob implements ShouldQueue
         $context = "[Server:{$this->server->id} '{$this->server->name}']";
 
         Log::info("{$context} Stopping server via queued job");
+        $service->stopAllHeadlessClients($this->server);
         $service->stop($this->server);
 
         $this->server->update(['status' => ServerStatus::Stopped]);

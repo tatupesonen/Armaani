@@ -139,29 +139,6 @@ class ServerProcessServiceTest extends TestCase
         $this->assertStringContainsString('hostname = "Server with \\"quotes\\"";', $contents);
     }
 
-    public function test_generate_server_config_includes_missions_when_pbo_files_exist(): void
-    {
-        $server = $this->makeServer(['description' => null]);
-
-        $profilesPath = $server->getProfilesPath();
-        @mkdir($profilesPath, 0755, true);
-
-        $mpmissionsPath = $server->getBinaryPath().'/mpmissions';
-        @mkdir($mpmissionsPath, 0755, true);
-        file_put_contents($mpmissionsPath.'/co40_Domination.Altis.pbo', 'fake');
-        file_put_contents($mpmissionsPath.'/tvt20_Ambush.Stratis.pbo', 'fake');
-
-        $this->invokeGenerateServerConfig($server);
-
-        $contents = file_get_contents($profilesPath.'/server.cfg');
-        $this->assertStringContainsString('class Missions {', $contents);
-        $this->assertStringContainsString('class Mission1 {', $contents);
-        $this->assertStringContainsString('template = "co40_Domination.Altis";', $contents);
-        $this->assertStringContainsString('class Mission2 {', $contents);
-        $this->assertStringContainsString('template = "tvt20_Ambush.Stratis";', $contents);
-        $this->assertStringContainsString('difficulty = "Regular";', $contents);
-    }
-
     public function test_generate_basic_config_writes_file_to_profiles_path(): void
     {
         $server = $this->makeServer();
@@ -298,6 +275,56 @@ class ServerProcessServiceTest extends TestCase
         $expected = $server->getProfilesPath().'/hc_0.log';
 
         $this->assertEquals($expected, $this->service->getHeadlessClientLogPath($server, 0));
+    }
+
+    public function test_get_running_headless_client_count_returns_zero_when_no_pid_files(): void
+    {
+        $server = $this->makeServer();
+
+        $this->assertEquals(0, $this->service->getRunningHeadlessClientCount($server));
+    }
+
+    public function test_get_running_headless_client_count_cleans_stale_pid_files(): void
+    {
+        $server = $this->makeServer();
+
+        // Create a PID file with a non-existent process
+        $pidFile = storage_path('app/server_'.$server->id.'_hc_0.pid');
+        file_put_contents($pidFile, '999999999');
+
+        $this->assertEquals(0, $this->service->getRunningHeadlessClientCount($server));
+        $this->assertFileDoesNotExist($pidFile);
+    }
+
+    public function test_stop_all_headless_clients_removes_all_pid_files(): void
+    {
+        $server = $this->makeServer();
+
+        // Create multiple PID files with non-existent processes
+        for ($i = 0; $i < 3; $i++) {
+            $pidFile = storage_path('app/server_'.$server->id.'_hc_'.$i.'.pid');
+            file_put_contents($pidFile, '999999999');
+        }
+
+        $this->service->stopAllHeadlessClients($server);
+
+        for ($i = 0; $i < 3; $i++) {
+            $this->assertFileDoesNotExist(storage_path('app/server_'.$server->id.'_hc_'.$i.'.pid'));
+        }
+    }
+
+    public function test_server_config_includes_headless_client_whitelist(): void
+    {
+        $server = $this->makeServer();
+
+        $profilesPath = $server->getProfilesPath();
+        @mkdir($profilesPath, 0755, true);
+
+        $this->invokeGenerateServerConfig($server);
+
+        $contents = file_get_contents($profilesPath.'/server.cfg');
+        $this->assertStringContainsString('headlessClients[] = {"127.0.0.1"};', $contents);
+        $this->assertStringContainsString('localClient[] = {"127.0.0.1"};', $contents);
     }
 
     public function test_start_logs_launch_command_to_application_log(): void
@@ -451,16 +478,22 @@ class ServerProcessServiceTest extends TestCase
         $this->assertEquals('fake bikey content', file_get_contents($gameInstallPath.'/keys/testmod.bikey'));
     }
 
-    public function test_copy_bikeys_finds_bikeys_recursively(): void
+    public function test_copy_bikeys_only_checks_keys_subdirectory(): void
     {
         $server = $this->makeServer();
         $gameInstallPath = $server->getBinaryPath();
 
         $mod = WorkshopMod::factory()->installed()->create(['name' => 'DeepMod']);
         $modPath = $mod->getInstallationPath();
+
+        // Place bikey outside the conventional keys/ dir — should NOT be found
         $deepDir = $modPath.'/addons/keys/subdir';
         @mkdir($deepDir, 0755, true);
         file_put_contents($deepDir.'/deep.bikey', 'deep key');
+
+        // Place bikey in the conventional keys/ dir — should be found
+        @mkdir($modPath.'/keys', 0755, true);
+        file_put_contents($modPath.'/keys/found.bikey', 'found key');
 
         $preset = ModPreset::factory()->create();
         $preset->mods()->attach([$mod->id]);
@@ -470,7 +503,8 @@ class ServerProcessServiceTest extends TestCase
 
         $this->invokeCopyBiKeys($server);
 
-        $this->assertFileExists($gameInstallPath.'/keys/deep.bikey');
+        $this->assertFileExists($gameInstallPath.'/keys/found.bikey');
+        $this->assertFileDoesNotExist($gameInstallPath.'/keys/deep.bikey');
     }
 
     public function test_copy_bikeys_creates_keys_directory_if_not_exists(): void

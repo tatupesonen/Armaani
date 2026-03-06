@@ -42,8 +42,6 @@ new #[Title('Servers')] class extends Component
 
     public ?int $createGameInstallId = null;
 
-    public int $createHeadlessClientCount = 0;
-
     public string $createAdditionalParams = '';
 
     public bool $createVerifySignatures = true;
@@ -84,8 +82,6 @@ new #[Title('Servers')] class extends Component
     public ?int $editActivePresetId = null;
 
     public ?int $editGameInstallId = null;
-
-    public int $editHeadlessClientCount = 0;
 
     public string $editAdditionalParams = '';
 
@@ -235,6 +231,43 @@ new #[Title('Servers')] class extends Component
         Log::info('User '.auth()->id().' ('.auth()->user()->name.") queued restart for server '{$server->name}'");
     }
 
+    // --- Headless clients ---
+
+    public function addHeadlessClient(Server $server): void
+    {
+        $service = app(ServerProcessService::class);
+
+        if (! $service->isRunning($server)) {
+            return;
+        }
+
+        $index = $service->addHeadlessClient($server);
+
+        if ($index !== null) {
+            Log::info('User '.auth()->id().' ('.auth()->user()->name.") added HC #{$index} to server '{$server->name}'");
+        }
+    }
+
+    public function removeHeadlessClient(Server $server): void
+    {
+        $service = app(ServerProcessService::class);
+
+        if (! $service->isRunning($server)) {
+            return;
+        }
+
+        $index = $service->removeHeadlessClient($server);
+
+        if ($index !== null) {
+            Log::info('User '.auth()->id().' ('.auth()->user()->name.") removed HC #{$index} from server '{$server->name}'");
+        }
+    }
+
+    public function getHeadlessClientCount(Server $server): int
+    {
+        return app(ServerProcessService::class)->getRunningHeadlessClientCount($server);
+    }
+
     // --- Delete ---
 
     public function confirmDelete(int $serverId): void
@@ -273,7 +306,6 @@ new #[Title('Servers')] class extends Component
         $this->createDescription = '';
         $this->createActivePresetId = null;
         $this->createGameInstallId = $this->gameInstalls->first()?->id;
-        $this->createHeadlessClientCount = 0;
         $this->createAdditionalParams = '';
         $this->createVerifySignatures = true;
         $this->createAllowedFilePatching = false;
@@ -302,7 +334,6 @@ new #[Title('Servers')] class extends Component
             'createDescription' => ['nullable', 'string'],
             'createActivePresetId' => ['nullable', 'exists:mod_presets,id'],
             'createGameInstallId' => ['required', 'exists:game_installs,id'],
-            'createHeadlessClientCount' => ['required', 'integer', 'min:0', 'max:10'],
             'createAdditionalParams' => ['nullable', 'string'],
             'createVerifySignatures' => ['boolean'],
             'createAllowedFilePatching' => ['boolean'],
@@ -325,7 +356,6 @@ new #[Title('Servers')] class extends Component
             'description' => $validated['createDescription'] ?: null,
             'active_preset_id' => $validated['createActivePresetId'],
             'game_install_id' => $validated['createGameInstallId'],
-            'headless_client_count' => $validated['createHeadlessClientCount'],
             'additional_params' => $validated['createAdditionalParams'] ?: null,
             'verify_signatures' => $validated['createVerifySignatures'],
             'allowed_file_patching' => $validated['createAllowedFilePatching'],
@@ -359,7 +389,6 @@ new #[Title('Servers')] class extends Component
         $this->editDescription = $server->description ?? '';
         $this->editActivePresetId = $server->active_preset_id;
         $this->editGameInstallId = $server->game_install_id;
-        $this->editHeadlessClientCount = $server->headless_client_count;
         $this->editAdditionalParams = $server->additional_params ?? '';
         $this->editVerifySignatures = $server->verify_signatures;
         $this->editAllowedFilePatching = $server->allowed_file_patching;
@@ -368,7 +397,7 @@ new #[Title('Servers')] class extends Component
         $this->editVonEnabled = $server->von_enabled;
         $this->editAdditionalServerOptions = $server->additional_server_options ?? '';
 
-        $difficulty = $server->difficultySettings ?? $server->difficultySettings()->create([]);
+        $difficulty = $server->difficultySettings ?? $server->difficultySettings()->create([])->refresh();
         $this->editReducedDamage = $difficulty->reduced_damage;
         $this->editGroupIndicators = $difficulty->group_indicators;
         $this->editFriendlyTags = $difficulty->friendly_tags;
@@ -421,7 +450,6 @@ new #[Title('Servers')] class extends Component
             'editDescription' => ['nullable', 'string'],
             'editActivePresetId' => ['nullable', 'exists:mod_presets,id'],
             'editGameInstallId' => ['required', 'exists:game_installs,id'],
-            'editHeadlessClientCount' => ['required', 'integer', 'min:0', 'max:10'],
             'editAdditionalParams' => ['nullable', 'string'],
             'editVerifySignatures' => ['boolean'],
             'editAllowedFilePatching' => ['boolean'],
@@ -467,7 +495,6 @@ new #[Title('Servers')] class extends Component
             'description' => $validated['editDescription'] ?: null,
             'active_preset_id' => $validated['editActivePresetId'],
             'game_install_id' => $validated['editGameInstallId'],
-            'headless_client_count' => $validated['editHeadlessClientCount'],
             'additional_params' => $validated['editAdditionalParams'] ?: null,
             'verify_signatures' => $validated['editVerifySignatures'],
             'allowed_file_patching' => $validated['editAllowedFilePatching'],
@@ -602,6 +629,17 @@ new #[Title('Servers')] class extends Component
                         </div>
                     </div>
 
+                    {{-- Headless client controls --}}
+                    @if ($status === 'running')
+                        @php $hcCount = $this->getHeadlessClientCount($server); @endphp
+                        <div class="flex items-center gap-2 px-4 pb-3">
+                            <flux:text class="text-sm font-medium">{{ __('Headless Clients') }}</flux:text>
+                            <flux:button size="xs" variant="ghost" wire:click="removeHeadlessClient({{ $server->id }})" icon="minus" :disabled="$hcCount < 1" />
+                            <flux:badge :variant="$hcCount > 0 ? 'primary' : 'secondary'" size="sm">{{ $hcCount }}</flux:badge>
+                            <flux:button size="xs" variant="ghost" wire:click="addHeadlessClient({{ $server->id }})" icon="plus" :disabled="$hcCount >= 10" />
+                        </div>
+                    @endif
+
                     {{-- Server log panel --}}
                     @if ($this->showLogs[$server->id] ?? ($status === 'running'))
                         <div class="border-t border-zinc-200 dark:border-zinc-700 p-4"
@@ -710,8 +748,6 @@ new #[Title('Servers')] class extends Component
                                     </flux:select>
                                     <flux:error name="editActivePresetId" />
                                 </flux:field>
-
-                                <flux:input wire:model="editHeadlessClientCount" :label="__('Headless Clients')" type="number" min="0" max="10" />
 
                                 <flux:separator />
 
@@ -905,8 +941,6 @@ new #[Title('Servers')] class extends Component
                 </flux:select>
                 <flux:error name="createActivePresetId" />
             </flux:field>
-
-            <flux:input wire:model="createHeadlessClientCount" :label="__('Headless Clients')" type="number" min="0" max="10" />
 
             <flux:separator />
 

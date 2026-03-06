@@ -47,6 +47,8 @@ class StartServerJobTest extends TestCase
         $server = Server::factory()->create(['status' => ServerStatus::Stopping]);
 
         $service = Mockery::mock(ServerProcessService::class);
+        $service->shouldReceive('getRunningHeadlessClientCount')->once()->andReturn(0);
+        $service->shouldReceive('stopAllHeadlessClients')->once()->with(Mockery::on(fn ($s) => $s->id === $server->id));
         $service->shouldReceive('stop')->once()->with(Mockery::on(fn ($s) => $s->id === $server->id));
         $service->shouldReceive('start')->once()->with(Mockery::on(fn ($s) => $s->id === $server->id));
         $service->shouldReceive('isRunning')->once()->andReturnTrue();
@@ -55,6 +57,42 @@ class StartServerJobTest extends TestCase
         (new StartServerJob($server, restart: true))->handle($service);
 
         $this->assertEquals(ServerStatus::Running, $server->fresh()->status);
+    }
+
+    public function test_restart_job_restores_headless_clients(): void
+    {
+        $server = Server::factory()->create(['status' => ServerStatus::Stopping]);
+
+        $service = Mockery::mock(ServerProcessService::class);
+        $service->shouldReceive('getRunningHeadlessClientCount')->once()->andReturn(3);
+        $service->shouldReceive('stopAllHeadlessClients')->once();
+        $service->shouldReceive('stop')->once();
+        $service->shouldReceive('start')->once();
+        $service->shouldReceive('isRunning')->once()->andReturnTrue();
+        $service->shouldReceive('addHeadlessClient')->times(3);
+        $this->app->instance(ServerProcessService::class, $service);
+
+        (new StartServerJob($server, restart: true))->handle($service);
+
+        $this->assertEquals(ServerStatus::Running, $server->fresh()->status);
+    }
+
+    public function test_restart_job_does_not_restore_headless_clients_on_failed_start(): void
+    {
+        $server = Server::factory()->create(['status' => ServerStatus::Stopping]);
+
+        $service = Mockery::mock(ServerProcessService::class);
+        $service->shouldReceive('getRunningHeadlessClientCount')->once()->andReturn(2);
+        $service->shouldReceive('stopAllHeadlessClients')->once();
+        $service->shouldReceive('stop')->once();
+        $service->shouldReceive('start')->once();
+        $service->shouldReceive('isRunning')->once()->andReturnFalse();
+        $service->shouldNotReceive('addHeadlessClient');
+        $this->app->instance(ServerProcessService::class, $service);
+
+        (new StartServerJob($server, restart: true))->handle($service);
+
+        $this->assertEquals(ServerStatus::Stopped, $server->fresh()->status);
     }
 
     public function test_failed_method_sets_stopped_status(): void

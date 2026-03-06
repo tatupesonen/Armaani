@@ -121,9 +121,11 @@ class BatchDownloadModsJobTest extends TestCase
         $steamCmd->shouldReceive('startBatchDownloadMods')->once()->andReturn($this->makeInvokedProcess(true));
 
         $workshop = Mockery::mock(SteamWorkshopService::class);
-        $workshop->shouldReceive('getModDetails')->once()->andReturn([
-            'name' => 'Fetched Name',
-            'file_size' => 75000000,
+        $workshop->shouldReceive('getMultipleModDetails')->once()->andReturn([
+            $mods[0]->workshop_id => [
+                'name' => 'Fetched Name',
+                'file_size' => 75000000,
+            ],
         ]);
 
         $this->app->instance(SteamCmdService::class, $steamCmd);

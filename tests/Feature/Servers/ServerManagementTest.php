@@ -77,7 +77,6 @@ class ServerManagementTest extends TestCase
             ->set('createAdminPassword', 'admin123')
             ->set('createDescription', 'A test server')
             ->set('createGameInstallId', $this->gameInstall->id)
-            ->set('createHeadlessClientCount', 2)
             ->call('createServer')
             ->assertHasNoErrors();
 
@@ -87,7 +86,6 @@ class ServerManagementTest extends TestCase
             'query_port' => 2303,
             'max_players' => 64,
             'game_install_id' => $this->gameInstall->id,
-            'headless_client_count' => 2,
         ]);
     }
 
@@ -210,22 +208,6 @@ class ServerManagementTest extends TestCase
             ->assertSet('createQueryPort', 2401);
     }
 
-    public function test_create_server_validates_headless_client_count(): void
-    {
-        $this->actingAs($this->user);
-
-        Livewire::test('pages::servers.index')
-            ->call('openCreateModal')
-            ->set('createName', 'HC Test')
-            ->set('createPort', 2302)
-            ->set('createQueryPort', 2303)
-            ->set('createMaxPlayers', 32)
-            ->set('createGameInstallId', $this->gameInstall->id)
-            ->set('createHeadlessClientCount', 15)
-            ->call('createServer')
-            ->assertHasErrors(['createHeadlessClientCount']);
-    }
-
     public function test_user_can_edit_server_inline(): void
     {
         $this->actingAs($this->user);
@@ -346,13 +328,13 @@ class ServerManagementTest extends TestCase
 
         $mock = Mockery::mock(ServerProcessService::class);
         $mock->shouldReceive('getStatus')->andReturn(ServerStatus::Stopped);
+        $mock->shouldReceive('getRunningHeadlessClientCount')->andReturn(0);
         $mock->shouldReceive('getServerLogPath')->with(Mockery::on(fn ($s) => $s->id === $server->id))->andReturn($logPath);
         $this->app->instance(ServerProcessService::class, $mock);
 
-        $result = Livewire::test('pages::servers.index')
-            ->call('loadServerLog', $server->id);
-
-        $this->assertEquals(['Line 1', 'Line 2', 'Line 3'], $result->effects['returns']['loadServerLog']);
+        Livewire::test('pages::servers.index')
+            ->call('loadServerLog', $server->id)
+            ->assertReturned(['Line 1', 'Line 2', 'Line 3']);
 
         // Clean up
         @unlink($logPath);
@@ -367,22 +349,122 @@ class ServerManagementTest extends TestCase
 
         $mock = Mockery::mock(ServerProcessService::class);
         $mock->shouldReceive('getStatus')->andReturn(ServerStatus::Stopped);
+        $mock->shouldReceive('getRunningHeadlessClientCount')->andReturn(0);
         $mock->shouldReceive('getServerLogPath')->with(Mockery::on(fn ($s) => $s->id === $server->id))->andReturn('/nonexistent/path/server.log');
         $this->app->instance(ServerProcessService::class, $mock);
 
-        $result = Livewire::test('pages::servers.index')
-            ->call('loadServerLog', $server->id);
-
-        $this->assertEquals(['No log file found.'], $result->effects['returns']['loadServerLog']);
+        Livewire::test('pages::servers.index')
+            ->call('loadServerLog', $server->id)
+            ->assertReturned(['No log file found.']);
     }
 
-    protected function mockServerProcessService(): void
+    public function test_headless_client_controls_hidden_when_server_stopped(): void
     {
+        $this->actingAs($this->user);
+
+        Server::factory()->create(['name' => 'Stopped HC Server']);
+
+        $this->mockServerProcessService();
+
+        Livewire::test('pages::servers.index')
+            ->assertDontSee('Headless Clients');
+    }
+
+    public function test_headless_client_controls_visible_when_server_running(): void
+    {
+        $this->actingAs($this->user);
+
+        Server::factory()->create(['name' => 'Running HC Server']);
+
+        $this->mockServerProcessService(ServerStatus::Running);
+
+        Livewire::test('pages::servers.index')
+            ->assertSee('Headless Clients');
+    }
+
+    public function test_add_headless_client_calls_service_when_server_running(): void
+    {
+        $this->actingAs($this->user);
+
+        $server = Server::factory()->create();
+
+        $mock = Mockery::mock(ServerProcessService::class);
+        $mock->shouldReceive('getStatus')->andReturn(ServerStatus::Running);
+        $mock->shouldReceive('isRunning')->andReturn(true);
+        $mock->shouldReceive('getRunningHeadlessClientCount')->andReturn(0);
+        $mock->shouldReceive('addHeadlessClient')
+            ->once()
+            ->with(Mockery::on(fn ($s) => $s->id === $server->id))
+            ->andReturn(0);
+        $this->app->instance(ServerProcessService::class, $mock);
+
+        Livewire::test('pages::servers.index')
+            ->call('addHeadlessClient', $server->id);
+    }
+
+    public function test_add_headless_client_does_nothing_when_server_stopped(): void
+    {
+        $this->actingAs($this->user);
+
+        $server = Server::factory()->create();
+
         $mock = Mockery::mock(ServerProcessService::class);
         $mock->shouldReceive('getStatus')->andReturn(ServerStatus::Stopped);
+        $mock->shouldReceive('isRunning')->andReturn(false);
+        $mock->shouldReceive('getRunningHeadlessClientCount')->andReturn(0);
+        $mock->shouldNotReceive('addHeadlessClient');
+        $this->app->instance(ServerProcessService::class, $mock);
+
+        Livewire::test('pages::servers.index')
+            ->call('addHeadlessClient', $server->id);
+    }
+
+    public function test_remove_headless_client_calls_service_when_server_running(): void
+    {
+        $this->actingAs($this->user);
+
+        $server = Server::factory()->create();
+
+        $mock = Mockery::mock(ServerProcessService::class);
+        $mock->shouldReceive('getStatus')->andReturn(ServerStatus::Running);
+        $mock->shouldReceive('isRunning')->andReturn(true);
+        $mock->shouldReceive('getRunningHeadlessClientCount')->andReturn(1);
+        $mock->shouldReceive('removeHeadlessClient')
+            ->once()
+            ->with(Mockery::on(fn ($s) => $s->id === $server->id))
+            ->andReturn(0);
+        $this->app->instance(ServerProcessService::class, $mock);
+
+        Livewire::test('pages::servers.index')
+            ->call('removeHeadlessClient', $server->id);
+    }
+
+    public function test_remove_headless_client_does_nothing_when_server_stopped(): void
+    {
+        $this->actingAs($this->user);
+
+        $server = Server::factory()->create();
+
+        $mock = Mockery::mock(ServerProcessService::class);
+        $mock->shouldReceive('getStatus')->andReturn(ServerStatus::Stopped);
+        $mock->shouldReceive('isRunning')->andReturn(false);
+        $mock->shouldReceive('getRunningHeadlessClientCount')->andReturn(0);
+        $mock->shouldNotReceive('removeHeadlessClient');
+        $this->app->instance(ServerProcessService::class, $mock);
+
+        Livewire::test('pages::servers.index')
+            ->call('removeHeadlessClient', $server->id);
+    }
+
+    protected function mockServerProcessService(ServerStatus $status = ServerStatus::Stopped): void
+    {
+        $mock = Mockery::mock(ServerProcessService::class);
+        $mock->shouldReceive('getStatus')->andReturn($status);
+        $mock->shouldReceive('isRunning')->andReturn($status === ServerStatus::Running);
         $mock->shouldReceive('start')->andReturnNull();
         $mock->shouldReceive('stop')->andReturnNull();
         $mock->shouldReceive('restart')->andReturnNull();
+        $mock->shouldReceive('getRunningHeadlessClientCount')->andReturn(0);
         $this->app->instance(ServerProcessService::class, $mock);
     }
 }

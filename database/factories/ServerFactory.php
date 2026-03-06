@@ -27,7 +27,6 @@ class ServerFactory extends Factory
             'description' => fake()->optional()->sentence(),
             'active_preset_id' => null,
             'game_install_id' => GameInstall::factory()->installed(),
-            'headless_client_count' => 0,
             'additional_params' => null,
             'verify_signatures' => true,
             'allowed_file_patching' => false,
