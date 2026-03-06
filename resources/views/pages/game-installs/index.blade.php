@@ -1,7 +1,8 @@
 <?php
 
-use App\Enums\GameInstallStatus;
+use App\Enums\InstallationStatus;
 use App\Jobs\InstallServerJob;
+use App\Livewire\Concerns\AuditsActions;
 use App\Models\GameInstall;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
@@ -9,6 +10,8 @@ use Livewire\Component;
 
 new #[Title('Game Installs')] class extends Component
 {
+    use AuditsActions;
+
     public bool $showCreateModal = false;
 
     public string $name = 'Arma 3 Server';
@@ -31,14 +34,14 @@ new #[Title('Game Installs')] class extends Component
     #[Computed]
     public function shouldPoll(): bool
     {
-        return $this->installs->contains(fn (GameInstall $install) => $install->installation_status === GameInstallStatus::Installing || $install->installation_status === GameInstallStatus::Queued
+        return $this->installs->contains(fn (GameInstall $install) => $install->installation_status === InstallationStatus::Installing || $install->installation_status === InstallationStatus::Queued
         );
     }
 
     public function toggleLogs(int $installId): void
     {
         $install = $this->installs->firstWhere('id', $installId);
-        $isActive = $install && ($install->installation_status === GameInstallStatus::Installing || $install->installation_status === GameInstallStatus::Queued);
+        $isActive = $install && ($install->installation_status === InstallationStatus::Installing || $install->installation_status === InstallationStatus::Queued);
         $this->showLogs[$installId] = ! ($this->showLogs[$installId] ?? $isActive);
     }
 
@@ -59,12 +62,12 @@ new #[Title('Game Installs')] class extends Component
 
         $install = GameInstall::query()->create([
             ...$validated,
-            'installation_status' => GameInstallStatus::Queued,
+            'installation_status' => InstallationStatus::Queued,
         ]);
 
         InstallServerJob::dispatch($install);
 
-        Log::info('User '.auth()->id().' ('.auth()->user()->name.") queued game install '{$install->name}' (branch: {$install->branch})");
+        $this->auditLog("queued game install '{$install->name}' (branch: {$install->branch})");
 
         $this->showCreateModal = false;
         unset($this->installs);
@@ -74,11 +77,11 @@ new #[Title('Game Installs')] class extends Component
 
     public function reinstall(GameInstall $gameInstall): void
     {
-        $gameInstall->update(['installation_status' => GameInstallStatus::Queued]);
+        $gameInstall->update(['installation_status' => InstallationStatus::Queued]);
 
         InstallServerJob::dispatch($gameInstall);
 
-        Log::info('User '.auth()->id().' ('.auth()->user()->name.") queued reinstall of '{$gameInstall->name}' (branch: {$gameInstall->branch})");
+        $this->auditLog("queued reinstall of '{$gameInstall->name}' (branch: {$gameInstall->branch})");
 
         unset($this->installs);
 
@@ -97,7 +100,7 @@ new #[Title('Game Installs')] class extends Component
             $install = GameInstall::query()->find($this->deletingInstallId);
 
             if ($install) {
-                if ($install->installation_status === GameInstallStatus::Installing || $install->installation_status === GameInstallStatus::Queued) {
+                if ($install->installation_status === InstallationStatus::Installing || $install->installation_status === InstallationStatus::Queued) {
                     return;
                 }
 
@@ -108,7 +111,7 @@ new #[Title('Game Installs')] class extends Component
                     \Illuminate\Support\Facades\Process::run(['rm', '-rf', $path]);
                 }
 
-                Log::info('User '.auth()->id().' ('.auth()->user()->name.") deleted game install '{$install->name}'");
+                $this->auditLog("deleted game install '{$install->name}'");
             }
         }
 
@@ -116,16 +119,6 @@ new #[Title('Game Installs')] class extends Component
         $this->deletingInstallId = null;
 
         unset($this->installs);
-    }
-
-    public function statusVariant(GameInstallStatus $status): string
-    {
-        return match ($status) {
-            GameInstallStatus::Installed => 'success',
-            GameInstallStatus::Installing => 'warning',
-            GameInstallStatus::Queued => 'secondary',
-            GameInstallStatus::Failed => 'danger',
-        };
     }
 }; ?>
 
@@ -153,43 +146,19 @@ new #[Title('Game Installs')] class extends Component
     @else
         <div class="space-y-4">
             @foreach ($this->installs as $install)
-                <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 p-4" wire:key="install-{{ $install->id }}"
-                    x-data="{
-                        progress: {{ $install->progress_pct }},
-                        lines: [],
-                        channel: null,
-                        maxLines: 200,
-                        init() {
-                            @if ($install->installation_status === GameInstallStatus::Installing || $install->installation_status === GameInstallStatus::Queued)
-                                this.channel = window.Echo.channel('game-install.{{ $install->id }}');
-                                this.channel.listen('GameInstallOutput', (event) => {
-                                    this.progress = event.progressPct;
-                                    this.lines.push(event.line);
-                                    if (this.lines.length > this.maxLines) {
-                                        this.lines = this.lines.slice(-this.maxLines);
-                                    }
-                                    this.$nextTick(() => this.scrollToBottom());
-                                });
-                            @endif
-                        },
-                        scrollToBottom() {
-                            if (this.$refs.logContainer) {
-                                this.$refs.logContainer.scrollTop = this.$refs.logContainer.scrollHeight;
-                            }
-                        },
-                        destroy() {
-                            if (this.channel) {
-                                window.Echo.leave('game-install.{{ $install->id }}');
-                                this.channel = null;
-                            }
-                        }
-                    }"
+                <x-log-viewer
+                    channel="game-install.{{ $install->id }}"
+                    event="GameInstallOutput"
+                    :track-progress="true"
+                    max-height="max-h-64"
+                    class="rounded-lg border border-zinc-200 dark:border-zinc-700 p-4"
+                    wire:key="install-{{ $install->id }}"
                 >
                     <div class="flex items-center justify-between">
                         <div class="flex-1 min-w-0">
                             <div class="flex items-center gap-2">
                                 <flux:heading size="lg">{{ $install->name }}</flux:heading>
-                                <flux:badge :variant="$this->statusVariant($install->installation_status)" size="sm">
+                                <flux:badge :variant="$install->installation_status->badgeVariant()" size="sm">
                                     {{ ucfirst($install->installation_status->value) }}
                                 </flux:badge>
                             </div>
@@ -206,11 +175,11 @@ new #[Title('Game Installs')] class extends Component
                                 {{ $install->getInstallationPath() }}
                             </flux:text>
 
-                            @if ($install->installation_status === GameInstallStatus::Installing || $install->installation_status === GameInstallStatus::Queued)
+                            @if ($install->installation_status === InstallationStatus::Installing || $install->installation_status === InstallationStatus::Queued)
                                 <div class="mt-2 w-64">
                                     <div class="flex items-center justify-between mb-1">
                                         <span class="text-xs text-zinc-500 dark:text-zinc-400">
-                                            {{ $install->installation_status === GameInstallStatus::Queued ? __('Queued...') : __('Downloading...') }}
+                                            {{ $install->installation_status === InstallationStatus::Queued ? __('Queued...') : __('Downloading...') }}
                                         </span>
                                         <span class="text-xs font-medium" x-text="progress + '%'"></span>
                                     </div>
@@ -222,38 +191,40 @@ new #[Title('Game Installs')] class extends Component
                         </div>
 
                         <div class="flex items-center gap-2">
-                            @if ($install->installation_status === GameInstallStatus::Installing || $install->installation_status === GameInstallStatus::Queued)
+                            @if ($install->installation_status === InstallationStatus::Installing || $install->installation_status === InstallationStatus::Queued)
                                 <flux:button size="sm" variant="ghost" wire:click="toggleLogs({{ $install->id }})" icon="command-line">
                                     {{ __('Logs') }}
                                 </flux:button>
                             @endif
-                            @if ($install->installation_status !== GameInstallStatus::Installing)
+                            @if ($install->installation_status !== InstallationStatus::Installing)
                                 <flux:button
                                     size="sm"
                                     wire:click="reinstall({{ $install->id }})"
                                     wire:confirm="{{ __('Re-install/update this game install? The queue will start a fresh SteamCMD run.') }}"
                                     icon="arrow-down-tray"
                                 >
-                                    {{ $install->installation_status === GameInstallStatus::Installed ? __('Update') : __('Install') }}
+                                    {{ $install->installation_status === InstallationStatus::Installed ? __('Update') : __('Install') }}
                                 </flux:button>
                             @endif
-                            <flux:button size="sm" variant="danger" wire:click="confirmDelete({{ $install->id }})" icon="trash" :disabled="$install->installation_status === GameInstallStatus::Installing || $install->installation_status === GameInstallStatus::Queued">
+                            <flux:button size="sm" variant="danger" wire:click="confirmDelete({{ $install->id }})" icon="trash" :disabled="$install->installation_status === InstallationStatus::Installing || $install->installation_status === InstallationStatus::Queued">
                                 {{ __('Delete') }}
                             </flux:button>
                         </div>
                     </div>
 
-                    @if ($this->showLogs[$install->id] ?? ($install->installation_status === GameInstallStatus::Installing || $install->installation_status === GameInstallStatus::Queued))
-                        <div class="mt-3 rounded bg-zinc-900 text-zinc-100 p-3 font-mono text-xs max-h-64 overflow-y-auto" x-ref="logContainer" wire:key="logs-{{ $install->id }}">
-                            <template x-if="lines.length === 0">
-                                <div class="text-zinc-500">{{ __('Waiting for output...') }}</div>
-                            </template>
-                            <template x-for="(line, index) in lines" :key="index">
-                                <div class="whitespace-pre-wrap break-all" x-text="line"></div>
-                            </template>
-                        </div>
-                    @endif
-                </div>
+                    <x-slot:log>
+                        @if ($this->showLogs[$install->id] ?? ($install->installation_status === InstallationStatus::Installing || $install->installation_status === InstallationStatus::Queued))
+                            <div class="mt-3 rounded bg-zinc-900 text-zinc-100 p-3 font-mono text-xs max-h-64 overflow-y-auto" x-ref="logContainer" wire:key="logs-{{ $install->id }}">
+                                <template x-if="lines.length === 0">
+                                    <div class="text-zinc-500">{{ __('Waiting for output...') }}</div>
+                                </template>
+                                <template x-for="(line, index) in lines" :key="index">
+                                    <div class="whitespace-pre-wrap break-all" x-text="line"></div>
+                                </template>
+                            </div>
+                        @endif
+                    </x-slot:log>
+                </x-log-viewer>
             @endforeach
         </div>
     @endif

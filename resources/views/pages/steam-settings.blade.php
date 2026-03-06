@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Concerns\AuditsActions;
 use App\Models\SteamAccount;
 use App\Services\SteamCmdService;
 use App\Services\SteamWorkshopService;
@@ -8,6 +9,8 @@ use Livewire\Component;
 
 new #[Title('Steam Settings')] class extends Component
 {
+    use AuditsActions;
+
     public string $username = '';
 
     public string $password = '';
@@ -63,7 +66,7 @@ new #[Title('Steam Settings')] class extends Component
             SteamAccount::query()->create($data);
         }
 
-        Log::info('User '.auth()->id().' ('.auth()->user()->name.') updated Steam credentials');
+        $this->auditLog('updated Steam credentials');
 
         $this->password = '';
         $this->loginVerified = null;
@@ -89,7 +92,7 @@ new #[Title('Steam Settings')] class extends Component
             $account->update(['steam_api_key' => $this->steam_api_key ?: null]);
         }
 
-        Log::info('User '.auth()->id().' ('.auth()->user()->name.') updated Steam API key');
+        $this->auditLog('updated Steam API key');
 
         $this->apiKeyVerified = null;
         $this->apiKeyError = null;
@@ -112,7 +115,7 @@ new #[Title('Steam Settings')] class extends Component
 
         $account->update(['mod_download_batch_size' => $this->mod_download_batch_size]);
 
-        Log::info('User '.auth()->id().' ('.auth()->user()->name.') updated download settings');
+        $this->auditLog('updated download settings');
 
         $this->dispatch('settings-saved');
     }

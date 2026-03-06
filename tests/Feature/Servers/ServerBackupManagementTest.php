@@ -11,11 +11,12 @@ use App\Services\ServerProcessService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Livewire\Livewire;
-use Mockery;
+use Tests\Concerns\MocksServerProcessService;
 use Tests\TestCase;
 
 class ServerBackupManagementTest extends TestCase
 {
+    use MocksServerProcessService;
     use RefreshDatabase;
 
     protected User $user;
@@ -329,17 +330,5 @@ class ServerBackupManagementTest extends TestCase
         file_put_contents($varsPath, $content);
 
         return $varsPath;
-    }
-
-    protected function mockServerProcessService(ServerStatus $status = ServerStatus::Stopped): void
-    {
-        $mock = Mockery::mock(ServerProcessService::class);
-        $mock->shouldReceive('getStatus')->andReturn($status);
-        $mock->shouldReceive('isRunning')->andReturn($status === ServerStatus::Running);
-        $mock->shouldReceive('start')->andReturnNull();
-        $mock->shouldReceive('stop')->andReturnNull();
-        $mock->shouldReceive('restart')->andReturnNull();
-        $mock->shouldReceive('getRunningHeadlessClientCount')->andReturn(0);
-        $this->app->instance(ServerProcessService::class, $mock);
     }
 }

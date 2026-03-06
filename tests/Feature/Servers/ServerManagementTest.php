@@ -11,10 +11,12 @@ use App\Services\ServerProcessService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Mockery;
+use Tests\Concerns\MocksServerProcessService;
 use Tests\TestCase;
 
 class ServerManagementTest extends TestCase
 {
+    use MocksServerProcessService;
     use RefreshDatabase;
 
     protected User $user;
@@ -51,6 +53,18 @@ class ServerManagementTest extends TestCase
 
         Livewire::test('pages::servers.index')
             ->assertSee('Alpha Squad Server');
+    }
+
+    public function test_servers_index_displays_storage_path(): void
+    {
+        $this->actingAs($this->user);
+
+        $server = Server::factory()->create(['name' => 'Path Server']);
+
+        $this->mockServerProcessService();
+
+        Livewire::test('pages::servers.index')
+            ->assertSee($server->getProfilesPath());
     }
 
     public function test_servers_index_shows_empty_state_when_no_servers(): void
@@ -506,17 +520,5 @@ class ServerManagementTest extends TestCase
 
         Livewire::test('pages::servers.index')
             ->call('removeHeadlessClient', $server->id);
-    }
-
-    protected function mockServerProcessService(ServerStatus $status = ServerStatus::Stopped): void
-    {
-        $mock = Mockery::mock(ServerProcessService::class);
-        $mock->shouldReceive('getStatus')->andReturn($status);
-        $mock->shouldReceive('isRunning')->andReturn($status === ServerStatus::Running);
-        $mock->shouldReceive('start')->andReturnNull();
-        $mock->shouldReceive('stop')->andReturnNull();
-        $mock->shouldReceive('restart')->andReturnNull();
-        $mock->shouldReceive('getRunningHeadlessClientCount')->andReturn(0);
-        $this->app->instance(ServerProcessService::class, $mock);
     }
 }

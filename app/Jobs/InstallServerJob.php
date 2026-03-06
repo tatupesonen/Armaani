@@ -2,17 +2,18 @@
 
 namespace App\Jobs;
 
-use App\Enums\GameInstallStatus;
+use App\Enums\InstallationStatus;
 use App\Events\GameInstallOutput;
+use App\Jobs\Concerns\InteractsWithFileSystem;
 use App\Models\GameInstall;
 use App\Services\SteamCmdService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Process;
 
 class InstallServerJob implements ShouldQueue
 {
+    use InteractsWithFileSystem;
     use Queueable;
 
     public int $tries = 2;
@@ -30,7 +31,7 @@ class InstallServerJob implements ShouldQueue
         }
 
         $this->gameInstall->update([
-            'installation_status' => GameInstallStatus::Installing,
+            'installation_status' => InstallationStatus::Installing,
             'progress_pct' => 0,
         ]);
 
@@ -75,7 +76,7 @@ class InstallServerJob implements ShouldQueue
             $diskSize = $this->getDirectorySize($installDir);
 
             $this->gameInstall->update([
-                'installation_status' => GameInstallStatus::Installed,
+                'installation_status' => InstallationStatus::Installed,
                 'progress_pct' => 100,
                 'disk_size_bytes' => $diskSize > 0 ? $diskSize : $this->gameInstall->disk_size_bytes,
                 'installed_at' => now(),
@@ -85,7 +86,7 @@ class InstallServerJob implements ShouldQueue
 
             GameInstallOutput::dispatch($this->gameInstall->id, 100, 'Installation completed successfully.');
         } else {
-            $this->gameInstall->update(['installation_status' => GameInstallStatus::Failed]);
+            $this->gameInstall->update(['installation_status' => InstallationStatus::Failed]);
 
             Log::error("Game installation failed for '{$this->gameInstall->name}': {$result->errorOutput()}");
 
@@ -95,18 +96,9 @@ class InstallServerJob implements ShouldQueue
         }
     }
 
-    private function getDirectorySize(string $path): int
+    public function failed(?\Throwable $exception): void
     {
-        if (! is_dir($path)) {
-            return 0;
-        }
-
-        $result = Process::run(['du', '-sb', $path]);
-
-        if (! $result->successful()) {
-            return 0;
-        }
-
-        return (int) explode("\t", trim($result->output()))[0];
+        Log::error("[GameInstall:{$this->gameInstall->id}] Job failed: ".($exception?->getMessage() ?? 'Unknown error'));
+        $this->gameInstall->update(['installation_status' => InstallationStatus::Failed]);
     }
 }

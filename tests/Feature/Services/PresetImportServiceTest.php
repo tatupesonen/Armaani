@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Unit\Services;
+namespace Tests\Feature\Services;
 
 use App\Enums\InstallationStatus;
 use App\Jobs\BatchDownloadModsJob;

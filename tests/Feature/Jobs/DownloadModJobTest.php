@@ -9,16 +9,18 @@ use App\Models\SteamAccount;
 use App\Models\WorkshopMod;
 use App\Services\SteamCmdService;
 use App\Services\SteamWorkshopService;
-use Illuminate\Contracts\Process\ProcessResult;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Process\InvokedProcess;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use Mockery;
+use Tests\Concerns\MocksSteamCmdProcess;
 use Tests\TestCase;
 
 class DownloadModJobTest extends TestCase
 {
+    use MocksSteamCmdProcess;
     use RefreshDatabase;
 
     protected function setUp(): void
@@ -249,45 +251,6 @@ class DownloadModJobTest extends TestCase
         $this->assertFileDoesNotExist($modPath.'/Mod.cpp');
 
         // Cleanup
-        $this->recursiveDeleteDir($modPath);
-    }
-
-    /**
-     * Build a mock InvokedProcess that finishes immediately with the given exit status.
-     */
-    private function makeInvokedProcess(bool $successful): InvokedProcess
-    {
-        $processResult = Mockery::mock(ProcessResult::class);
-        $processResult->shouldReceive('successful')->andReturn($successful);
-        $processResult->shouldReceive('output')->andReturn('');
-        $processResult->shouldReceive('errorOutput')->andReturn('');
-
-        $invokedProcess = Mockery::mock(InvokedProcess::class);
-        $invokedProcess->shouldReceive('running')->andReturn(false);
-        $invokedProcess->shouldReceive('wait')->andReturn($processResult);
-
-        return $invokedProcess;
-    }
-
-    private function recursiveDeleteDir(string $path): void
-    {
-        if (! is_dir($path)) {
-            return;
-        }
-
-        $items = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($path, \RecursiveDirectoryIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST
-        );
-
-        foreach ($items as $item) {
-            if ($item->isFile() || is_link($item->getPathname())) {
-                @unlink($item->getPathname());
-            } elseif ($item->isDir()) {
-                @rmdir($item->getPathname());
-            }
-        }
-
-        @rmdir($path);
+        File::deleteDirectory($modPath);
     }
 }

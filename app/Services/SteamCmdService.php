@@ -10,6 +10,13 @@ use RuntimeException;
 
 class SteamCmdService
 {
+    protected string $steamcmdPath;
+
+    public function __construct()
+    {
+        $this->steamcmdPath = config('arma.steamcmd_path');
+    }
+
     /**
      * Build and run a SteamCMD command to install or update the Arma 3 server,
      * streaming output line-by-line to the given callback.
@@ -35,10 +42,8 @@ class SteamCmdService
             return $this->run($args);
         }
 
-        $steamcmdPath = config('arma.steamcmd_path');
-
         return Process::timeout(7200)
-            ->run(array_merge([$steamcmdPath], $args), function (string $type, string $output) use ($onOutput): void {
+            ->run(array_merge([$this->steamcmdPath], $args), function (string $type, string $output) use ($onOutput): void {
                 foreach (explode("\n", $output) as $line) {
                     $line = trim($line);
                     if ($line !== '') {
@@ -58,10 +63,8 @@ class SteamCmdService
         $args[] = '+workshop_download_item '.config('arma.game_id').' '.$workshopId.' validate';
         $args[] = '+quit';
 
-        $steamcmdPath = config('arma.steamcmd_path');
-
         return Process::timeout(3600)
-            ->start(array_merge([$steamcmdPath], $args));
+            ->start(array_merge([$this->steamcmdPath], $args));
     }
 
     /**
@@ -83,25 +86,11 @@ class SteamCmdService
 
         $args[] = '+quit';
 
-        $steamcmdPath = config('arma.steamcmd_path');
-
         // Scale timeout by number of mods: 1 hour per mod in the batch
         $timeout = max(3600, count($workshopIds) * 3600);
 
         return Process::timeout($timeout)
-            ->start(array_merge([$steamcmdPath], $args));
-    }
-
-    /**
-     * Build and run a SteamCMD command to download a single workshop mod.
-     */
-    public function downloadMod(string $installDir, int $workshopId): ProcessResult
-    {
-        $args = $this->baseArgs($installDir);
-        $args[] = '+workshop_download_item '.config('arma.game_id').' '.$workshopId.' validate';
-        $args[] = '+quit';
-
-        return $this->run($args);
+            ->start(array_merge([$this->steamcmdPath], $args));
     }
 
     /**
@@ -109,10 +98,8 @@ class SteamCmdService
      */
     public function validateCredentials(string $username, string $password): bool
     {
-        $steamcmdPath = config('arma.steamcmd_path');
-
         $result = Process::timeout(60)->run([
-            $steamcmdPath,
+            $this->steamcmdPath,
             '+login', $username, $password,
             '+quit',
         ]);
@@ -125,10 +112,8 @@ class SteamCmdService
      */
     protected function run(array $args): ProcessResult
     {
-        $steamcmdPath = config('arma.steamcmd_path');
-
         return Process::timeout(3600)
-            ->run(array_merge([$steamcmdPath], $args));
+            ->run(array_merge([$this->steamcmdPath], $args));
     }
 
     /**
@@ -138,7 +123,7 @@ class SteamCmdService
      */
     protected function baseArgs(string $installDir): array
     {
-        $account = SteamAccount::query()->latest()->first();
+        $account = SteamAccount::current();
 
         if (! $account) {
             throw new RuntimeException('No Steam account configured. Please configure Steam credentials in Settings.');

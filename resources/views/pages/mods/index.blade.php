@@ -3,6 +3,7 @@
 use App\Enums\InstallationStatus;
 use App\Jobs\BatchDownloadModsJob;
 use App\Jobs\DownloadModJob;
+use App\Livewire\Concerns\AuditsActions;
 use App\Models\SteamAccount;
 use App\Models\WorkshopMod;
 use Livewire\Attributes\Computed;
@@ -11,6 +12,8 @@ use Livewire\Component;
 
 new #[Title('Workshop Mods')] class extends Component
 {
+    use AuditsActions;
+
     public string $workshopId = '';
 
     public string $search = '';
@@ -126,7 +129,7 @@ new #[Title('Workshop Mods')] class extends Component
             }
         }
 
-        Log::info('User '.auth()->id().' ('.auth()->user()->name.') queued update for '.$mods->count().' mods in batches of '.$batchSize);
+        $this->auditLog('queued update for '.$mods->count().' mods in batches of '.$batchSize);
 
         $this->selectedMods = [];
         unset($this->mods, $this->failedMods, $this->selectableMods, $this->isAllSelected);
@@ -161,7 +164,7 @@ new #[Title('Workshop Mods')] class extends Component
 
         if ($mod->installation_status !== InstallationStatus::Installed) {
             DownloadModJob::dispatch($mod);
-            Log::info('User '.auth()->id().' ('.auth()->user()->name.") queued mod download: workshop ID {$workshopId}");
+            $this->auditLog("queued mod download: workshop ID {$workshopId}");
         }
 
         $this->workshopId = '';
@@ -173,7 +176,7 @@ new #[Title('Workshop Mods')] class extends Component
         $mod->update(['installation_status' => InstallationStatus::Queued]);
 
         DownloadModJob::dispatch($mod);
-        Log::info('User '.auth()->id().' ('.auth()->user()->name.") retried mod download: '{$mod->name}' ({$mod->workshop_id})");
+        $this->auditLog("retried mod download: '{$mod->name}' ({$mod->workshop_id})");
         unset($this->mods);
     }
 
@@ -201,7 +204,7 @@ new #[Title('Workshop Mods')] class extends Component
             }
         }
 
-        Log::info('User '.auth()->id().' ('.auth()->user()->name.') retried all failed mods ('.$failedMods->count().' mods in batches of '.$batchSize.')');
+        $this->auditLog('retried all failed mods ('.$failedMods->count().' mods in batches of '.$batchSize.')');
         unset($this->mods, $this->failedMods);
     }
 
@@ -220,19 +223,9 @@ new #[Title('Workshop Mods')] class extends Component
             \Illuminate\Support\Facades\Process::run(['rm', '-rf', $path]);
         }
 
-        Log::info('User '.auth()->id().' ('.auth()->user()->name.") deleted mod '{$mod->name}' ({$mod->workshop_id})");
+        $this->auditLog("deleted mod '{$mod->name}' ({$mod->workshop_id})");
 
         unset($this->mods);
-    }
-
-    public function statusVariant(InstallationStatus $status): string
-    {
-        return match ($status) {
-            InstallationStatus::Installed => 'success',
-            InstallationStatus::Installing => 'warning',
-            InstallationStatus::Queued => 'secondary',
-            InstallationStatus::Failed => 'danger',
-        };
     }
 }; ?>
 
@@ -309,37 +302,14 @@ new #[Title('Workshop Mods')] class extends Component
                     </tr>
                 </thead>
                 @foreach ($this->mods as $mod)
-                    <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700" wire:key="mod-group-{{ $mod->id }}"
-                        x-data="{
-                            progress: {{ $mod->progress_pct }},
-                            lines: [],
-                            channel: null,
-                            maxLines: 200,
-                            init() {
-                                @if ($mod->installation_status === InstallationStatus::Installing || $mod->installation_status === InstallationStatus::Queued)
-                                    this.channel = window.Echo.channel('mod-download.{{ $mod->id }}');
-                                    this.channel.listen('ModDownloadOutput', (event) => {
-                                        this.progress = event.progressPct;
-                                        this.lines.push(event.line);
-                                        if (this.lines.length > this.maxLines) {
-                                            this.lines = this.lines.slice(-this.maxLines);
-                                        }
-                                        this.$nextTick(() => this.scrollToBottom());
-                                    });
-                                @endif
-                            },
-                            scrollToBottom() {
-                                if (this.$refs.logContainer) {
-                                    this.$refs.logContainer.scrollTop = this.$refs.logContainer.scrollHeight;
-                                }
-                            },
-                            destroy() {
-                                if (this.channel) {
-                                    window.Echo.leave('mod-download.{{ $mod->id }}');
-                                    this.channel = null;
-                                }
-                            }
-                        }"
+                    <x-log-viewer
+                        channel="mod-download.{{ $mod->id }}"
+                        event="ModDownloadOutput"
+                        :track-progress="true"
+                        max-height="max-h-48"
+                        tag="tbody"
+                        class="divide-y divide-zinc-200 dark:divide-zinc-700"
+                        wire:key="mod-group-{{ $mod->id }}"
                     >
                         <tr wire:key="mod-{{ $mod->id }}">
                             <td class="px-4 py-3">
@@ -368,7 +338,7 @@ new #[Title('Workshop Mods')] class extends Component
                                     </div>
                                 </div>
                             @else
-                                    <flux:badge :variant="$this->statusVariant($mod->installation_status)" size="sm">
+                                    <flux:badge :variant="$mod->installation_status->badgeVariant()" size="sm">
                                         {{ ucfirst($mod->installation_status->value) }}
                                     </flux:badge>
                                 @endif
@@ -391,21 +361,24 @@ new #[Title('Workshop Mods')] class extends Component
                                 </div>
                             </td>
                         </tr>
-                        @if ($this->showLogs[$mod->id] ?? ($mod->installation_status === InstallationStatus::Installing || $mod->installation_status === InstallationStatus::Queued))
-                            <tr wire:key="mod-logs-{{ $mod->id }}">
-                                <td colspan="6" class="px-4 py-3">
-                                    <div class="rounded bg-zinc-900 text-zinc-100 p-3 font-mono text-xs max-h-48 overflow-y-auto" x-ref="logContainer">
-                                        <template x-if="lines.length === 0">
-                                            <div class="text-zinc-500">{{ __('Waiting for output...') }}</div>
-                                        </template>
-                                        <template x-for="(line, index) in lines" :key="index">
-                                            <div class="whitespace-pre-wrap break-all" x-text="line"></div>
-                                        </template>
-                                    </div>
-                                </td>
-                            </tr>
-                        @endif
-                    </tbody>
+
+                        <x-slot:log>
+                            @if ($this->showLogs[$mod->id] ?? ($mod->installation_status === InstallationStatus::Installing || $mod->installation_status === InstallationStatus::Queued))
+                                <tr wire:key="mod-logs-{{ $mod->id }}">
+                                    <td colspan="6" class="px-4 py-3">
+                                        <div class="rounded bg-zinc-900 text-zinc-100 p-3 font-mono text-xs max-h-48 overflow-y-auto" x-ref="logContainer">
+                                            <template x-if="lines.length === 0">
+                                                <div class="text-zinc-500">{{ __('Waiting for output...') }}</div>
+                                            </template>
+                                            <template x-for="(line, index) in lines" :key="index">
+                                                <div class="whitespace-pre-wrap break-all" x-text="line"></div>
+                                            </template>
+                                        </div>
+                                    </td>
+                                </tr>
+                            @endif
+                        </x-slot:log>
+                    </x-log-viewer>
                 @endforeach
             </table>
         </div>

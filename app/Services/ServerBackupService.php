@@ -13,7 +13,7 @@ class ServerBackupService
      */
     public function getVarsFilePath(Server $server): string
     {
-        $profileName = 'arma3_'.$server->id;
+        $profileName = $server->getProfileName();
 
         return $server->getProfilesPath().'/home/'.$profileName.'/'.$profileName.'.vars.Arma3Profile';
     }
@@ -33,7 +33,22 @@ class ServerBackupService
             return null;
         }
 
-        $data = file_get_contents($varsPath);
+        return $this->persistBackup($server, file_get_contents($varsPath), $name, $isAutomatic);
+    }
+
+    /**
+     * Create a backup from uploaded file data.
+     */
+    public function createFromUpload(Server $server, string $data, ?string $name = null): ServerBackup
+    {
+        return $this->persistBackup($server, $data, $name, isAutomatic: false);
+    }
+
+    /**
+     * Persist a backup record, log it, and prune old backups.
+     */
+    private function persistBackup(Server $server, string $data, ?string $name, bool $isAutomatic): ServerBackup
+    {
         $fileSize = strlen($data);
 
         $backup = $server->backups()->create([
@@ -43,28 +58,8 @@ class ServerBackupService
             'data' => $data,
         ]);
 
-        Log::info("[Server:{$server->id} '{$server->name}'] Created ".($isAutomatic ? 'automatic' : 'manual')." backup #{$backup->id} ({$fileSize} bytes)");
-
-        $this->pruneOldBackups($server);
-
-        return $backup;
-    }
-
-    /**
-     * Create a backup from uploaded file data.
-     */
-    public function createFromUpload(Server $server, string $data, ?string $name = null): ServerBackup
-    {
-        $fileSize = strlen($data);
-
-        $backup = $server->backups()->create([
-            'name' => $name,
-            'file_size' => $fileSize,
-            'is_automatic' => false,
-            'data' => $data,
-        ]);
-
-        Log::info("[Server:{$server->id} '{$server->name}'] Created backup #{$backup->id} from upload ({$fileSize} bytes)");
+        $type = $isAutomatic ? 'automatic' : 'manual';
+        Log::info("[Server:{$server->id} '{$server->name}'] Created {$type} backup #{$backup->id} ({$fileSize} bytes)");
 
         $this->pruneOldBackups($server);
 

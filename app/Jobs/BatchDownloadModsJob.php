@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Enums\InstallationStatus;
 use App\Events\ModDownloadOutput;
+use App\Jobs\Concerns\InteractsWithFileSystem;
 use App\Models\WorkshopMod;
 use App\Services\SteamCmdService;
 use App\Services\SteamWorkshopService;
@@ -11,10 +12,10 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Process;
 
 class BatchDownloadModsJob implements ShouldQueue
 {
+    use InteractsWithFileSystem;
     use Queueable;
 
     public int $tries = 2;
@@ -179,45 +180,5 @@ class BatchDownloadModsJob implements ShouldQueue
             $mod->update(['installation_status' => InstallationStatus::Failed]);
             ModDownloadOutput::dispatch($mod->id, 0, 'Batch download failed: '.$errorOutput);
         }
-    }
-
-    /**
-     * Recursively convert all file and directory names to lowercase.
-     * Required for Arma 3 on Linux where filenames are case-sensitive.
-     */
-    private function convertToLowercase(string $path): void
-    {
-        if (! is_dir($path)) {
-            return;
-        }
-
-        $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($path, \RecursiveDirectoryIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST
-        );
-
-        foreach ($iterator as $item) {
-            $lowercaseName = strtolower($item->getFilename());
-
-            if ($item->getFilename() !== $lowercaseName) {
-                $newPath = $item->getPath().'/'.$lowercaseName;
-                rename($item->getPathname(), $newPath);
-            }
-        }
-    }
-
-    private function getDirectorySize(string $path): int
-    {
-        if (! is_dir($path)) {
-            return 0;
-        }
-
-        $result = Process::run(['du', '-sb', $path]);
-
-        if (! $result->successful()) {
-            return 0;
-        }
-
-        return (int) explode("\t", trim($result->output()))[0];
     }
 }

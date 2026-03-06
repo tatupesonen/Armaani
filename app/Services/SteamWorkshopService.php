@@ -14,7 +14,7 @@ class SteamWorkshopService
      */
     public function getModDetails(int $workshopId): ?array
     {
-        return $this->fetchPublishedFileDetails($workshopId);
+        return $this->getMultipleModDetails([$workshopId])[$workshopId] ?? null;
     }
 
     /**
@@ -93,40 +93,12 @@ class SteamWorkshopService
      */
     public function getApiKey(): ?string
     {
-        $account = SteamAccount::query()->latest()->first();
+        $account = SteamAccount::current();
 
         if ($account?->steam_api_key) {
             return $account->steam_api_key;
         }
 
         return config('arma.steam_api_key');
-    }
-
-    /**
-     * Fetch published file details from the Steam Web API.
-     *
-     * @return array{name: string|null, file_size: int|null}|null
-     */
-    protected function fetchPublishedFileDetails(int $workshopId): ?array
-    {
-        $response = Http::asForm()->post('https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/', [
-            'itemcount' => 1,
-            'publishedfileids[0]' => $workshopId,
-        ]);
-
-        if (! $response->successful()) {
-            return null;
-        }
-
-        $details = $response->json('response.publishedfiledetails.0');
-
-        if (! $details || ($details['result'] ?? 0) !== 1) {
-            return null;
-        }
-
-        return [
-            'name' => $details['title'] ?? null,
-            'file_size' => isset($details['file_size']) ? (int) $details['file_size'] : null,
-        ];
     }
 }

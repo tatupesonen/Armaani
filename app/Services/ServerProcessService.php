@@ -55,22 +55,7 @@ class ServerProcessService
         // Start the server as a detached child process using proc_open.
         // The 'exec' prefix replaces the shell with the server binary so
         // the PID we capture IS the server process — signals target it directly.
-        $descriptors = [
-            0 => ['file', '/dev/null', 'r'],
-            1 => ['file', $logFile, 'a'],
-            2 => ['file', $logFile, 'a'],
-        ];
-
-        $process = proc_open('exec '.$command, $descriptors, $pipes, $binaryDir);
-
-        if (is_resource($process)) {
-            $status = proc_get_status($process);
-            $pid = $status['pid'];
-            file_put_contents($pidFile, (string) $pid);
-            Log::info("{$context} Process started with PID {$pid}");
-        } else {
-            Log::error("{$context} Failed to start server process");
-        }
+        $this->spawnProcess($command, $binaryDir, $logFile, $pidFile, $context);
     }
 
     /**
@@ -211,14 +196,7 @@ class ServerProcessService
         $pidFiles = glob(storage_path('app/server_'.$server->id.'_hc_*.pid')) ?: [];
 
         foreach ($pidFiles as $pidFile) {
-            $pid = (int) trim(file_get_contents($pidFile));
-
-            if ($pid > 0 && $this->isProcessRunning($pid)) {
-                Log::info("{$context} Stopping headless client (PID {$pid})");
-                posix_kill($pid, SIGTERM);
-            }
-
-            @unlink($pidFile);
+            $this->terminateProcess($pidFile, $context);
         }
     }
 
@@ -266,20 +244,7 @@ class ServerProcessService
     protected function stopHeadlessClient(Server $server, int $index): void
     {
         $context = "[Server:{$server->id} '{$server->name}' HC:{$index}]";
-        $pidFile = $this->getHcPidFilePath($server, $index);
-
-        if (! file_exists($pidFile)) {
-            return;
-        }
-
-        $pid = (int) trim(file_get_contents($pidFile));
-
-        if ($pid > 0 && $this->isProcessRunning($pid)) {
-            Log::info("{$context} Stopping headless client (PID {$pid})");
-            posix_kill($pid, SIGTERM);
-        }
-
-        @unlink($pidFile);
+        $this->terminateProcess($this->getHcPidFilePath($server, $index), $context);
     }
 
     /**
@@ -291,7 +256,7 @@ class ServerProcessService
         $params = [];
 
         $params[] = '-port='.$server->port;
-        $params[] = '-name=arma3_'.$server->id;
+        $params[] = '-name='.$server->getProfileName();
         $params[] = '-profiles='.$server->getProfilesPath();
         $params[] = '-config='.$server->getProfilesPath().'/server.cfg';
         $params[] = '-cfg='.$server->getProfilesPath().'/server_basic.cfg';
@@ -423,7 +388,7 @@ class ServerProcessService
     protected function generateProfileConfig(Server $server): void
     {
         $settings = $server->difficultySettings ?? $this->getDefaultDifficultySettings();
-        $profileName = 'arma3_'.$server->id;
+        $profileName = $server->getProfileName();
         $profileDir = $server->getProfilesPath().'/home/'.$profileName;
 
         if (! is_dir($profileDir)) {
@@ -673,22 +638,58 @@ class ServerProcessService
 
         file_put_contents($logFile, '');
 
+        $this->spawnProcess($command, $binaryDir, $logFile, $pidFile, $context);
+    }
+
+    /**
+     * Spawn a detached process via proc_open, capture its PID, and write a PID file.
+     * The 'exec' prefix replaces the shell so the PID targets the actual binary.
+     *
+     * @return int|null The PID of the spawned process, or null on failure.
+     */
+    protected function spawnProcess(string $command, string $workingDir, string $logFile, string $pidFile, string $context): ?int
+    {
         $descriptors = [
             0 => ['file', '/dev/null', 'r'],
             1 => ['file', $logFile, 'a'],
             2 => ['file', $logFile, 'a'],
         ];
 
-        $process = proc_open('exec '.$command, $descriptors, $pipes, $binaryDir);
+        $process = proc_open('exec '.$command, $descriptors, $pipes, $workingDir);
 
         if (is_resource($process)) {
             $status = proc_get_status($process);
             $pid = $status['pid'];
             file_put_contents($pidFile, (string) $pid);
-            Log::info("{$context} Headless client started with PID {$pid}");
-        } else {
-            Log::error("{$context} Failed to start headless client");
+            Log::info("{$context} Process started with PID {$pid}");
+
+            return $pid;
         }
+
+        Log::error("{$context} Failed to start process");
+
+        return null;
+    }
+
+    /**
+     * Read a PID file, send SIGTERM to the process if running, and remove the PID file.
+     */
+    protected function terminateProcess(string $pidFile, string $context = ''): void
+    {
+        if (! file_exists($pidFile)) {
+            return;
+        }
+
+        $pid = (int) trim(file_get_contents($pidFile));
+
+        if ($pid > 0 && $this->isProcessRunning($pid)) {
+            if ($context !== '') {
+                Log::info("{$context} Stopping process (PID {$pid})");
+            }
+            posix_kill($pid, SIGTERM);
+        }
+
+        @unlink($pidFile);
     }
 
     protected function getPid(Server $server): ?int
@@ -763,17 +764,7 @@ class ServerProcessService
      */
     protected function stopLogTail(Server $server): void
     {
-        $pidFile = $this->getLogTailPidFilePath($server);
-
-        if (file_exists($pidFile)) {
-            $pid = (int) trim(file_get_contents($pidFile));
-
-            if ($pid > 0 && $this->isProcessRunning($pid)) {
-                posix_kill($pid, SIGTERM);
-            }
-
-            @unlink($pidFile);
-        }
+        $this->terminateProcess($this->getLogTailPidFilePath($server));
     }
 
     protected function getLogTailPidFilePath(Server $server): string

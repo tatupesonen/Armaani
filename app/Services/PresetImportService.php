@@ -127,7 +127,7 @@ class PresetImportService
             return;
         }
 
-        $batchSize = SteamAccount::query()->latest()->first()?->mod_download_batch_size ?? 5;
+        $batchSize = SteamAccount::current()?->mod_download_batch_size ?? 5;
 
         foreach ($mods->chunk($batchSize) as $batch) {
             if ($batch->count() === 1) {

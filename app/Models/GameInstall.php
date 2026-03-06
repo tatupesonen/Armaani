@@ -2,9 +2,10 @@
 
 namespace App\Models;
 
-use App\Enums\GameInstallStatus;
+use App\Enums\InstallationStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class GameInstall extends Model
 {
@@ -26,11 +27,16 @@ class GameInstall extends Model
     protected function casts(): array
     {
         return [
-            'installation_status' => GameInstallStatus::class,
+            'installation_status' => InstallationStatus::class,
             'progress_pct' => 'integer',
             'disk_size_bytes' => 'integer',
             'installed_at' => 'datetime',
         ];
+    }
+
+    public function servers(): HasMany
+    {
+        return $this->hasMany(Server::class);
     }
 
     /**

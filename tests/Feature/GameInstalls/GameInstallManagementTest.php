@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\GameInstalls;
 
-use App\Enums\GameInstallStatus;
+use App\Enums\InstallationStatus;
 use App\Jobs\InstallServerJob;
 use App\Models\GameInstall;
 use App\Models\User;
@@ -100,7 +100,7 @@ class GameInstallManagementTest extends TestCase
 
         $this->assertDatabaseHas('game_installs', [
             'id' => $install->id,
-            'installation_status' => GameInstallStatus::Queued->value,
+            'installation_status' => InstallationStatus::Queued->value,
         ]);
 
         Queue::assertPushed(InstallServerJob::class, function (InstallServerJob $job) use ($install) {

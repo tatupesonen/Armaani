@@ -34,6 +34,11 @@ class Server extends Model
         'additional_server_options',
     ];
 
+    protected $hidden = [
+        'password',
+        'admin_password',
+    ];
+
     /**
      * @return array<string, string>
      */
@@ -81,5 +86,13 @@ class Server extends Model
     public function getBinaryPath(): string
     {
         return $this->gameInstall->getInstallationPath();
+    }
+
+    /**
+     * Get the Arma 3 profile name used for -name= launch param and profile directories.
+     */
+    public function getProfileName(): string
+    {
+        return 'arma3_'.$this->id;
     }
 }

@@ -8,6 +8,7 @@ use App\Models\Server;
 use App\Models\WorkshopMod;
 use App\Services\ServerProcessService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
@@ -248,12 +249,12 @@ class ServerProcessServiceTest extends TestCase
 
     protected function tearDown(): void
     {
-        $this->recursiveDelete($this->testServersBasePath);
-        $this->recursiveDelete($this->testGamesBasePath);
-        $this->recursiveDelete($this->testModsBasePath);
+        File::deleteDirectory($this->testServersBasePath);
+        File::deleteDirectory($this->testGamesBasePath);
+        File::deleteDirectory($this->testModsBasePath);
 
         if (isset($this->missionsPath)) {
-            $this->recursiveDelete($this->missionsPath);
+            File::deleteDirectory($this->missionsPath);
         }
 
         parent::tearDown();
@@ -593,30 +594,5 @@ class ServerProcessServiceTest extends TestCase
     {
         $reflection = new \ReflectionMethod(ServerProcessService::class, 'generateBasicConfig');
         $reflection->invoke($this->service, $server);
-    }
-
-    /**
-     * Recursively delete a directory and all its contents (handling symlinks).
-     */
-    private function recursiveDelete(string $path): void
-    {
-        if (! is_dir($path) && ! is_link($path)) {
-            return;
-        }
-
-        $items = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($path, \RecursiveDirectoryIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST
-        );
-
-        foreach ($items as $item) {
-            if (is_link($item->getPathname()) || $item->isFile()) {
-                @unlink($item->getPathname());
-            } elseif ($item->isDir()) {
-                @rmdir($item->getPathname());
-            }
-        }
-
-        @rmdir($path);
     }
 }

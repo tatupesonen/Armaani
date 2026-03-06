@@ -10,6 +10,14 @@ class SteamAccount extends Model
     /** @use HasFactory<\Database\Factories\SteamAccountFactory> */
     use HasFactory;
 
+    /**
+     * Get the current (most recent) SteamAccount.
+     */
+    public static function current(): ?self
+    {
+        return static::query()->latest()->first();
+    }
+
     protected $fillable = [
         'username',
         'password',

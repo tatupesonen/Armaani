@@ -1,16 +1,16 @@
 <?php
 
-use App\Enums\GameInstallStatus;
+use App\Enums\InstallationStatus;
 use App\Enums\ServerStatus;
 use App\Jobs\StartServerJob;
 use App\Jobs\StopServerJob;
+use App\Livewire\Concerns\AuditsActions;
 use App\Models\GameInstall;
 use App\Models\ModPreset;
 use App\Models\Server;
 use App\Models\ServerBackup;
 use App\Services\ServerBackupService;
 use App\Services\ServerProcessService;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
@@ -21,6 +21,7 @@ use Livewire\WithFileUploads;
 
 new #[Title('Servers')] class extends Component
 {
+    use AuditsActions;
     use WithFileUploads;
 
     // List state
@@ -180,7 +181,7 @@ new #[Title('Servers')] class extends Component
     public function gameInstalls()
     {
         return GameInstall::query()
-            ->whereIn('installation_status', [GameInstallStatus::Installed->value, GameInstallStatus::Installing->value])
+            ->whereIn('installation_status', [InstallationStatus::Installed->value, InstallationStatus::Installing->value])
             ->orderBy('name')
             ->get();
     }
@@ -240,21 +241,21 @@ new #[Title('Servers')] class extends Component
     {
         $server->update(['status' => ServerStatus::Starting]);
         StartServerJob::dispatch($server);
-        Log::info('User '.auth()->id().' ('.auth()->user()->name.") queued start for server '{$server->name}'");
+        $this->auditLog("queued start for server '{$server->name}'");
     }
 
     public function stopServer(Server $server): void
     {
         $server->update(['status' => ServerStatus::Stopping]);
         StopServerJob::dispatch($server);
-        Log::info('User '.auth()->id().' ('.auth()->user()->name.") queued stop for server '{$server->name}'");
+        $this->auditLog("queued stop for server '{$server->name}'");
     }
 
     public function restartServer(Server $server): void
     {
         $server->update(['status' => ServerStatus::Stopping]);
         StartServerJob::dispatch($server, restart: true);
-        Log::info('User '.auth()->id().' ('.auth()->user()->name.") queued restart for server '{$server->name}'");
+        $this->auditLog("queued restart for server '{$server->name}'");
     }
 
     // --- Headless clients ---
@@ -270,7 +271,7 @@ new #[Title('Servers')] class extends Component
         $index = $service->addHeadlessClient($server);
 
         if ($index !== null) {
-            Log::info('User '.auth()->id().' ('.auth()->user()->name.") added HC #{$index} to server '{$server->name}'");
+            $this->auditLog("added HC #{$index} to server '{$server->name}'");
         }
     }
 
@@ -285,7 +286,7 @@ new #[Title('Servers')] class extends Component
         $index = $service->removeHeadlessClient($server);
 
         if ($index !== null) {
-            Log::info('User '.auth()->id().' ('.auth()->user()->name.") removed HC #{$index} from server '{$server->name}'");
+            $this->auditLog("removed HC #{$index} from server '{$server->name}'");
         }
     }
 
@@ -315,7 +316,7 @@ new #[Title('Servers')] class extends Component
 
             if ($server && $this->getStatus($server) === 'stopped') {
                 $server->delete();
-                Log::info('User '.auth()->id().' ('.auth()->user()->name.") deleted server '{$server->name}'");
+                $this->auditLog("deleted server '{$server->name}'");
             }
         }
 
@@ -399,7 +400,7 @@ new #[Title('Servers')] class extends Component
 
         $server->difficultySettings()->create([]);
 
-        Log::info('User '.auth()->id().' ('.auth()->user()->name.") created server '{$validated['createName']}' (port: {$validated['createPort']})");
+        $this->auditLog("created server '{$validated['createName']}' (port: {$validated['createPort']})");
 
         $this->showCreateModal = false;
         unset($this->servers);
@@ -562,7 +563,7 @@ new #[Title('Servers')] class extends Component
             'precision_ai' => $validated['editPrecisionAi'],
         ]);
 
-        Log::info('User '.auth()->id().' ('.auth()->user()->name.") updated server '{$validated['editName']}'");
+        $this->auditLog("updated server '{$validated['editName']}'");
 
         $this->editingServerId = null;
         unset($this->servers);
@@ -585,7 +586,7 @@ new #[Title('Servers')] class extends Component
         $this->backupName = '';
 
         if ($backup) {
-            Log::info('User '.auth()->id().' ('.auth()->user()->name.") created backup for server '{$server->name}'");
+            $this->auditLog("created backup for server '{$server->name}'");
             session()->flash('backup-status-'.$server->id, __('Backup created successfully.'));
         } else {
             session()->flash('backup-error-'.$server->id, __('No .vars.Arma3Profile file found for this server. Start the server at least once first.'));
@@ -606,7 +607,7 @@ new #[Title('Servers')] class extends Component
             $this->backupUploadName ?: $this->backupUploadFile->getClientOriginalName(),
         );
 
-        Log::info('User '.auth()->id().' ('.auth()->user()->name.") uploaded backup for server '{$server->name}'");
+        $this->auditLog("uploaded backup for server '{$server->name}'");
 
         $this->backupUploadFile = null;
         $this->backupUploadName = '';
@@ -639,7 +640,7 @@ new #[Title('Servers')] class extends Component
 
         app(ServerBackupService::class)->restore($backup);
 
-        Log::info('User '.auth()->id().' ('.auth()->user()->name.") restored backup #{$backup->id} for server '{$server->name}'");
+        $this->auditLog("restored backup #{$backup->id} for server '{$server->name}'");
 
         $this->confirmingRestore = false;
         $this->restoringBackupId = null;
@@ -653,7 +654,7 @@ new #[Title('Servers')] class extends Component
         $backupId = $backup->id;
         $backup->delete();
 
-        Log::info('User '.auth()->id().' ('.auth()->user()->name.") deleted backup #{$backupId} from server '{$server->name}'");
+        $this->auditLog("deleted backup #{$backupId} from server '{$server->name}'");
 
         session()->flash('backup-status-'.$server->id, __('Backup deleted.'));
     }
@@ -710,6 +711,9 @@ new #[Title('Servers')] class extends Component
                                 @if ($server->activePreset)
                                     &middot; {{ __('Preset') }}: {{ $server->activePreset->name }}
                                 @endif
+                            </flux:text>
+                            <flux:text class="mt-0.5 font-mono text-xs text-zinc-400 dark:text-zinc-500">
+                                {{ $server->getProfilesPath() }}
                             </flux:text>
                         </div>
 
@@ -777,49 +781,16 @@ new #[Title('Servers')] class extends Component
 
                     {{-- Server log panel --}}
                     @if ($this->showLogs[$server->id] ?? in_array($status, ['booting', 'running']))
-                        <div class="border-t border-zinc-200 dark:border-zinc-700 p-4"
-                            x-data="{
-                                lines: [],
-                                channel: null,
-                                maxLines: 200,
-                                init() {
-                                    $wire.loadServerLog({{ $server->id }}).then(initialLines => {
-                                        this.lines = initialLines;
-                                        this.$nextTick(() => this.scrollToBottom());
-                                    });
-                                    this.channel = window.Echo.channel('server-log.{{ $server->id }}');
-                                    this.channel.listen('ServerLogOutput', (event) => {
-                                        this.lines.push(event.line);
-                                        if (this.lines.length > this.maxLines) {
-                                            this.lines = this.lines.slice(-this.maxLines);
-                                        }
-                                        this.$nextTick(() => this.scrollToBottom());
-                                    });
-                                },
-                                scrollToBottom() {
-                                    if (this.$refs.logContainer) {
-                                        this.$refs.logContainer.scrollTop = this.$refs.logContainer.scrollHeight;
-                                    }
-                                },
-                                destroy() {
-                                    if (this.channel) {
-                                        window.Echo.leave('server-log.{{ $server->id }}');
-                                        this.channel = null;
-                                    }
-                                }
-                            }"
+                        <x-log-viewer
+                            channel="server-log.{{ $server->id }}"
+                            event="ServerLogOutput"
+                            max-height="max-h-[32rem]"
+                            wire-load-method="loadServerLog({{ $server->id }})"
+                            class="border-t border-zinc-200 dark:border-zinc-700 p-4"
                             wire:key="server-logs-{{ $server->id }}"
                         >
                             <flux:text class="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-2">{{ __('Server Log') }}</flux:text>
-                            <div class="rounded bg-zinc-900 text-zinc-100 p-3 font-mono text-xs max-h-[32rem] overflow-y-auto" x-ref="logContainer">
-                                <template x-if="lines.length === 0">
-                                    <div class="text-zinc-500">{{ __('Waiting for output...') }}</div>
-                                </template>
-                                <template x-for="(line, index) in lines" :key="index">
-                                    <div class="whitespace-pre-wrap break-all" x-text="line"></div>
-                                </template>
-                            </div>
-                        </div>
+                        </x-log-viewer>
                     @endif
 
                     {{-- Launch command panel --}}
@@ -836,69 +807,7 @@ new #[Title('Servers')] class extends Component
                             <form wire:submit="saveServer" class="space-y-4">
                                 <flux:input wire:model="editName" :label="__('Server Name')" required />
 
-                                <div class="grid grid-cols-2 gap-4">
-                                    <flux:field>
-                                        <flux:label>{{ __('Game Port') }}</flux:label>
-                                        <flux:input wire:model.live="editPort" type="number" required />
-                                        <flux:error name="editPort" />
-                                    </flux:field>
-                                    <flux:field>
-                                        <flux:label>{{ __('Query Port') }}</flux:label>
-                                        <flux:input wire:model="editQueryPort" type="number" required />
-                                        <flux:error name="editQueryPort" />
-                                    </flux:field>
-                                </div>
-
-                                <flux:input wire:model="editMaxPlayers" :label="__('Max Players')" type="number" required />
-
-                                <div class="grid grid-cols-2 gap-4">
-                                    <flux:input wire:model="editPassword" :label="__('Server Password')" type="text" :placeholder="__('Leave empty for no password')" />
-                                    <flux:input wire:model="editAdminPassword" :label="__('Admin Password')" type="text" />
-                                </div>
-
-                                <flux:textarea wire:model="editDescription" :label="__('Description')" rows="2" />
-
-                                <flux:field>
-                                    <flux:label>{{ __('Game Install') }}</flux:label>
-                                    <flux:select wire:model="editGameInstallId">
-                                        @foreach ($this->gameInstalls as $install)
-                                            <flux:select.option :value="$install->id">
-                                                {{ $install->name }} ({{ $install->branch }})
-                                            </flux:select.option>
-                                        @endforeach
-                                    </flux:select>
-                                    <flux:error name="editGameInstallId" />
-                                    @if ($this->gameInstalls->isEmpty())
-                                        <flux:description>{{ __('No game installs available. Add one on the Game Installs page.') }}</flux:description>
-                                    @endif
-                                </flux:field>
-
-                                <flux:field>
-                                    <flux:label>{{ __('Active Mod Preset') }}</flux:label>
-                                    <flux:select wire:model="editActivePresetId">
-                                        <flux:select.option :value="null">{{ __('None') }}</flux:select.option>
-                                        @foreach ($this->presets as $preset)
-                                            <flux:select.option :value="$preset->id">{{ $preset->name }} ({{ $preset->mods()->count() }} mods)</flux:select.option>
-                                        @endforeach
-                                    </flux:select>
-                                    <flux:error name="editActivePresetId" />
-                                </flux:field>
-
-                                <flux:separator />
-
-                                <flux:heading size="lg">{{ __('Server Rules') }}</flux:heading>
-
-                                <div class="space-y-3">
-                                    <flux:switch wire:model="editVerifySignatures" label="{{ __('Verify Signatures') }}" description="{{ __('Kick players with unsigned or modified addon files (verifySignatures=2). Disable for lenient modded servers.') }}" />
-                                    <flux:separator variant="subtle" />
-                                    <flux:switch wire:model="editAllowedFilePatching" label="{{ __('Allow File Patching') }}" description="{{ __('Allow clients to use file patching (allowedFilePatching=2). Required by some mods like ACE.') }}" />
-                                    <flux:separator variant="subtle" />
-                                    <flux:switch wire:model="editBattleEye" label="{{ __('BattlEye Anti-Cheat') }}" description="{{ __('Enable BattlEye anti-cheat protection. May conflict with some mod setups.') }}" />
-                                    <flux:separator variant="subtle" />
-                                    <flux:switch wire:model="editVonEnabled" label="{{ __('Voice Over Network') }}" description="{{ __('Enable in-game voice communication.') }}" />
-                                    <flux:separator variant="subtle" />
-                                    <flux:switch wire:model="editPersistent" label="{{ __('Persistent Server') }}" description="{{ __('Keep the server running even when no players are connected.') }}" />
-                                </div>
+                                @include('pages.servers.partials.form-fields', ['prefix' => 'edit'])
 
                                 <flux:separator />
 
@@ -1147,69 +1056,7 @@ new #[Title('Servers')] class extends Component
         <form wire:submit="createServer" class="space-y-4">
             <flux:input wire:model="createName" :label="__('Server Name')" required />
 
-            <div class="grid grid-cols-2 gap-4">
-                <flux:field>
-                    <flux:label>{{ __('Game Port') }}</flux:label>
-                    <flux:input wire:model.live="createPort" type="number" required />
-                    <flux:error name="createPort" />
-                </flux:field>
-                <flux:field>
-                    <flux:label>{{ __('Query Port') }}</flux:label>
-                    <flux:input wire:model="createQueryPort" type="number" required />
-                    <flux:error name="createQueryPort" />
-                </flux:field>
-            </div>
-
-            <flux:input wire:model="createMaxPlayers" :label="__('Max Players')" type="number" required />
-
-            <div class="grid grid-cols-2 gap-4">
-                <flux:input wire:model="createPassword" :label="__('Server Password')" type="text" :placeholder="__('Leave empty for no password')" />
-                <flux:input wire:model="createAdminPassword" :label="__('Admin Password')" type="text" />
-            </div>
-
-            <flux:textarea wire:model="createDescription" :label="__('Description')" rows="2" />
-
-            <flux:field>
-                <flux:label>{{ __('Game Install') }}</flux:label>
-                <flux:select wire:model="createGameInstallId">
-                    @foreach ($this->gameInstalls as $install)
-                        <flux:select.option :value="$install->id">
-                            {{ $install->name }} ({{ $install->branch }})
-                        </flux:select.option>
-                    @endforeach
-                </flux:select>
-                <flux:error name="createGameInstallId" />
-                @if ($this->gameInstalls->isEmpty())
-                    <flux:description>{{ __('No game installs available. Add one on the Game Installs page first.') }}</flux:description>
-                @endif
-            </flux:field>
-
-            <flux:field>
-                <flux:label>{{ __('Active Mod Preset') }}</flux:label>
-                <flux:select wire:model="createActivePresetId">
-                    <flux:select.option :value="null">{{ __('None') }}</flux:select.option>
-                    @foreach ($this->presets as $preset)
-                        <flux:select.option :value="$preset->id">{{ $preset->name }} ({{ $preset->mods()->count() }} mods)</flux:select.option>
-                    @endforeach
-                </flux:select>
-                <flux:error name="createActivePresetId" />
-            </flux:field>
-
-            <flux:separator />
-
-            <flux:heading size="lg">{{ __('Server Rules') }}</flux:heading>
-
-            <div class="space-y-3">
-                <flux:switch wire:model="createVerifySignatures" label="{{ __('Verify Signatures') }}" description="{{ __('Kick players with unsigned or modified addon files (verifySignatures=2). Disable for lenient modded servers.') }}" />
-                <flux:separator variant="subtle" />
-                <flux:switch wire:model="createAllowedFilePatching" label="{{ __('Allow File Patching') }}" description="{{ __('Allow clients to use file patching (allowedFilePatching=2). Required by some mods like ACE.') }}" />
-                <flux:separator variant="subtle" />
-                <flux:switch wire:model="createBattleEye" label="{{ __('BattlEye Anti-Cheat') }}" description="{{ __('Enable BattlEye anti-cheat protection. May conflict with some mod setups.') }}" />
-                <flux:separator variant="subtle" />
-                <flux:switch wire:model="createVonEnabled" label="{{ __('Voice Over Network') }}" description="{{ __('Enable in-game voice communication.') }}" />
-                <flux:separator variant="subtle" />
-                <flux:switch wire:model="createPersistent" label="{{ __('Persistent Server') }}" description="{{ __('Keep the server running even when no players are connected.') }}" />
-            </div>
+            @include('pages.servers.partials.form-fields', ['prefix' => 'create'])
 
             <flux:separator />
 

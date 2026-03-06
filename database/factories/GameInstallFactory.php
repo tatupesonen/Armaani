@@ -2,7 +2,7 @@
 
 namespace Database\Factories;
 
-use App\Enums\GameInstallStatus;
+use App\Enums\InstallationStatus;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -18,7 +18,7 @@ class GameInstallFactory extends Factory
         return [
             'name' => 'Arma 3 Server',
             'branch' => 'public',
-            'installation_status' => GameInstallStatus::Queued,
+            'installation_status' => InstallationStatus::Queued,
             'installed_at' => null,
         ];
     }
@@ -26,7 +26,7 @@ class GameInstallFactory extends Factory
     public function installed(): static
     {
         return $this->state(fn (): array => [
-            'installation_status' => GameInstallStatus::Installed,
+            'installation_status' => InstallationStatus::Installed,
             'installed_at' => now(),
         ]);
     }
@@ -34,7 +34,7 @@ class GameInstallFactory extends Factory
     public function failed(): static
     {
         return $this->state(fn (): array => [
-            'installation_status' => GameInstallStatus::Failed,
+            'installation_status' => InstallationStatus::Failed,
             'installed_at' => null,
         ]);
     }

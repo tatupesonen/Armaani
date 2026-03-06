@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Concerns\AuditsActions;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -7,6 +8,7 @@ use Livewire\WithFileUploads;
 
 new #[Title('Missions')] class extends Component
 {
+    use AuditsActions;
     use WithFileUploads;
 
     /** @var \Livewire\Features\SupportFileUploads\TemporaryUploadedFile[] */
@@ -74,7 +76,7 @@ new #[Title('Missions')] class extends Component
         $this->missions = [];
 
         if ($uploaded > 0) {
-            Log::info('User '.auth()->id().' ('.auth()->user()->name.") uploaded {$uploaded} mission file(s)");
+            $this->auditLog("uploaded {$uploaded} mission file(s)");
             session()->flash('mission-success', __(':count mission(s) uploaded successfully.', ['count' => $uploaded]));
         }
     }
@@ -85,7 +87,7 @@ new #[Title('Missions')] class extends Component
 
         if (file_exists($path)) {
             unlink($path);
-            Log::info('User '.auth()->id().' ('.auth()->user()->name.") deleted mission '{$filename}'");
+            $this->auditLog("deleted mission '{$filename}'");
         }
     }
 }; ?>
