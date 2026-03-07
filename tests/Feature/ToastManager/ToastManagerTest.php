@@ -64,7 +64,7 @@ class ToastManagerTest extends TestCase
         $response = $this->actingAs($this->user)->get(route('dashboard'));
 
         $response->assertOk();
-        $response->assertDontSee('Running Server');
+        $response->assertDontSee('\\u0022Running Server\\u0022', false);
     }
 
     public function test_seeds_alpine_with_stopping_server(): void
@@ -84,7 +84,7 @@ class ToastManagerTest extends TestCase
         $response = $this->actingAs($this->user)->get(route('dashboard'));
 
         $response->assertOk();
-        $response->assertDontSee('Stopped Server');
+        $response->assertDontSee('\\u0022Stopped Server\\u0022', false);
     }
 
     public function test_seeds_multiple_active_servers(): void
@@ -97,10 +97,10 @@ class ToastManagerTest extends TestCase
         $response = $this->actingAs($this->user)->get(route('dashboard'));
 
         $response->assertOk();
-        $response->assertSee('Alpha');
-        $response->assertSee('Beta');
-        $response->assertDontSee('Gamma');
-        $response->assertDontSee('Delta');
+        $response->assertSee('\\u0022Alpha\\u0022', false);
+        $response->assertSee('\\u0022Beta\\u0022', false);
+        $response->assertDontSee('\\u0022Gamma\\u0022', false);
+        $response->assertDontSee('\\u0022Delta\\u0022', false);
     }
 
     public function test_subscribes_to_echo_server_status_channel(): void

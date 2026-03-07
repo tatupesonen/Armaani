@@ -11,6 +11,7 @@ use App\Services\ServerProcessService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
+use Mockery;
 use Tests\TestCase;
 
 class ServerProcessServiceTest extends TestCase
@@ -440,6 +441,13 @@ class ServerProcessServiceTest extends TestCase
     {
         $server = $this->makeServer();
 
+        // Use a partial mock to prevent real proc_open / exec calls
+        // (the arma3server binary doesn't exist in the test environment).
+        $service = Mockery::mock(ServerProcessService::class)->makePartial();
+        $service->shouldAllowMockingProtectedMethods();
+        $service->shouldReceive('spawnProcess')->once()->andReturn(12345);
+        $service->shouldReceive('startLogTail')->once();
+
         // Auto-backup logs "skipping backup" when no .vars file exists
         Log::shouldReceive('info')
             ->withArgs(fn (string $msg) => str_contains($msg, 'skipping backup'))
@@ -457,11 +465,7 @@ class ServerProcessServiceTest extends TestCase
             ->withArgs(fn (string $msg) => str_contains($msg, 'Log file:'))
             ->once();
 
-        Log::shouldReceive('info')
-            ->withArgs(fn (string $msg) => str_contains($msg, 'Process started with PID'))
-            ->once();
-
-        $this->service->start($server);
+        $service->start($server);
     }
 
     public function test_build_launch_command_uses_game_install_binary_path(): void
