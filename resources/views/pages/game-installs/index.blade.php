@@ -72,7 +72,7 @@ new #[Title('Game Installs')] class extends Component
         $this->showCreateModal = false;
         unset($this->installs);
 
-        session()->flash('status', "Game install '{$install->name}' queued.");
+        $this->dispatch('toast', message: "Game install '{$install->name}' queued.", variant: 'success');
     }
 
     public function reinstall(GameInstall $gameInstall): void
@@ -85,7 +85,7 @@ new #[Title('Game Installs')] class extends Component
 
         unset($this->installs);
 
-        session()->flash('status', "Re-install queued for '{$gameInstall->name}'.");
+        $this->dispatch('toast', message: "Re-install queued for '{$gameInstall->name}'.", variant: 'success');
     }
 
     public function confirmDelete(int $installId): void
@@ -132,12 +132,6 @@ new #[Title('Game Installs')] class extends Component
             {{ __('New Install') }}
         </flux:button>
     </div>
-
-    @if (session('status'))
-        <flux:callout variant="success" class="mb-4">
-            {{ session('status') }}
-        </flux:callout>
-    @endif
 
     @if ($this->installs->isEmpty())
         <flux:callout>

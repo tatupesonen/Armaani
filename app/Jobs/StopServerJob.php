@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Enums\ServerStatus;
+use App\Events\ServerStatusChanged;
 use App\Models\Server;
 use App\Services\ServerProcessService;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -28,12 +29,14 @@ class StopServerJob implements ShouldQueue
         $service->stop($this->server);
 
         $this->server->update(['status' => ServerStatus::Stopped]);
+        ServerStatusChanged::dispatch($this->server->id, ServerStatus::Stopped->value, $this->server->name);
         Log::info("{$context} Server stopped successfully");
     }
 
     public function failed(?\Throwable $exception): void
     {
         $this->server->update(['status' => ServerStatus::Stopped]);
+        ServerStatusChanged::dispatch($this->server->id, ServerStatus::Stopped->value, $this->server->name);
         Log::error("[Server:{$this->server->id}] StopServerJob failed: {$exception?->getMessage()}");
     }
 }

@@ -19,13 +19,29 @@ new #[Title('Workshop Mods')] class extends Component
 
     public string $search = '';
 
-    public string $sortStatus = '';
+    public string $sortBy = '';
+
+    public string $sortDirection = 'asc';
 
     /** @var list<int> */
     public array $selectedMods = [];
 
     /** @var array<int, bool> */
     public array $showLogs = [];
+
+    #[Computed]
+    public function installedModStats(): array
+    {
+        $result = WorkshopMod::query()
+            ->where('installation_status', InstallationStatus::Installed)
+            ->selectRaw('COUNT(*) as count, COALESCE(SUM(file_size), 0) as total_size')
+            ->first();
+
+        return [
+            'count' => (int) $result->count,
+            'total_size' => (int) $result->total_size,
+        ];
+    }
 
     #[Computed]
     public function mods()
@@ -37,34 +53,44 @@ new #[Title('Workshop Mods')] class extends Component
             InstallationStatus::Installed->value => 3,
         ];
 
-        $mods = WorkshopMod::query()
+        $query = WorkshopMod::query()
             ->when($this->search !== '', function ($query) {
                 $query->where(function ($q) {
                     $q->where('name', 'like', '%'.$this->search.'%')
                         ->orWhere('workshop_id', 'like', '%'.$this->search.'%');
                 });
-            })
-            ->orderByDesc('created_at')
-            ->get();
+            });
 
-        if ($this->sortStatus === 'asc') {
-            return $mods->sortBy(fn (WorkshopMod $mod) => $statusOrder[$mod->installation_status->value] ?? 99)->values();
+        if ($this->sortBy !== '' && $this->sortBy !== 'status') {
+            $query->orderBy($this->sortBy, $this->sortDirection);
+        } else {
+            $query->orderByDesc('created_at');
         }
 
-        if ($this->sortStatus === 'desc') {
-            return $mods->sortByDesc(fn (WorkshopMod $mod) => $statusOrder[$mod->installation_status->value] ?? 99)->values();
+        $mods = $query->get();
+
+        if ($this->sortBy === 'status') {
+            return $this->sortDirection === 'asc'
+                ? $mods->sortBy(fn (WorkshopMod $mod) => $statusOrder[$mod->installation_status->value] ?? 99)->values()
+                : $mods->sortByDesc(fn (WorkshopMod $mod) => $statusOrder[$mod->installation_status->value] ?? 99)->values();
         }
 
         return $mods;
     }
 
-    public function toggleSortStatus(): void
+    public function toggleSort(string $column): void
     {
-        $this->sortStatus = match ($this->sortStatus) {
-            '' => 'asc',
-            'asc' => 'desc',
-            'desc' => '',
-        };
+        if ($this->sortBy === $column) {
+            if ($this->sortDirection === 'asc') {
+                $this->sortDirection = 'desc';
+            } else {
+                $this->sortBy = '';
+                $this->sortDirection = 'asc';
+            }
+        } else {
+            $this->sortBy = $column;
+            $this->sortDirection = 'asc';
+        }
 
         unset($this->mods);
     }
@@ -139,7 +165,7 @@ new #[Title('Workshop Mods')] class extends Component
         $this->auditLog('queued update for '.$mods->count().' mods in batches of '.$batchSize);
 
         $this->selectedMods = [];
-        unset($this->mods, $this->failedMods, $this->outdatedMods, $this->selectableMods, $this->isAllSelected);
+        unset($this->mods, $this->installedModStats, $this->failedMods, $this->outdatedMods, $this->selectableMods, $this->isAllSelected);
     }
 
     public function checkForUpdates(SteamWorkshopService $workshop): void
@@ -175,9 +201,9 @@ new #[Title('Workshop Mods')] class extends Component
         $outdatedCount = $this->outdatedMods->count();
 
         if ($outdatedCount > 0) {
-            session()->flash('status', "{$outdatedCount} mod(s) have updates available.");
+            $this->dispatch('toast', message: "{$outdatedCount} mod(s) have updates available.", variant: 'info');
         } else {
-            session()->flash('status', 'All mods are up to date.');
+            $this->dispatch('toast', message: 'All mods are up to date.', variant: 'success');
         }
     }
 
@@ -209,7 +235,7 @@ new #[Title('Workshop Mods')] class extends Component
         $this->auditLog('queued update for '.$mods->count().' outdated mods in batches of '.$batchSize);
 
         $this->selectedMods = [];
-        unset($this->mods, $this->failedMods, $this->outdatedMods, $this->selectableMods, $this->isAllSelected);
+        unset($this->mods, $this->installedModStats, $this->failedMods, $this->outdatedMods, $this->selectableMods, $this->isAllSelected);
     }
 
     public function toggleLogs(int $modId): void
@@ -302,14 +328,25 @@ new #[Title('Workshop Mods')] class extends Component
 
         $this->auditLog("deleted mod '{$mod->name}' ({$mod->workshop_id})");
 
-        unset($this->mods, $this->outdatedMods);
+        unset($this->mods, $this->installedModStats, $this->outdatedMods);
     }
 }; ?>
 
 <section class="w-full" @if($this->shouldPoll) wire:poll.5s @endif>
     <div class="mb-6">
         <flux:heading size="xl">{{ __('Workshop Mods') }}</flux:heading>
-        <flux:text class="mt-2">{{ __('Download and manage Steam Workshop mods.') }}</flux:text>
+        <flux:text class="mt-2">
+            {{ __('Download and manage Steam Workshop mods.') }}
+            @if ($this->installedModStats['count'] > 0)
+                @php
+                    $totalBytes = $this->installedModStats['total_size'];
+                    $formattedSize = $totalBytes >= 1073741824
+                        ? number_format($totalBytes / 1073741824, 2) . ' GB'
+                        : number_format($totalBytes / 1048576, 1) . ' MB';
+                @endphp
+                <span class="ml-1 text-zinc-500 dark:text-zinc-400">&mdash; {{ $this->installedModStats['count'] }} {{ __('installed') }}, {{ $formattedSize }} {{ __('total') }}</span>
+            @endif
+        </flux:text>
     </div>
 
     <div class="flex items-end justify-between gap-4 mb-6">
@@ -349,12 +386,6 @@ new #[Title('Workshop Mods')] class extends Component
         </div>
     </div>
 
-    @if (session('status'))
-        <flux:callout variant="info" class="mb-4">
-            {{ session('status') }}
-        </flux:callout>
-    @endif
-
     @if ($this->mods->isEmpty() && $this->search === '')
         <flux:callout>
             {{ __('No mods added yet. Enter a Steam Workshop ID above to download a mod.') }}
@@ -378,21 +409,46 @@ new #[Title('Workshop Mods')] class extends Component
                         </th>
                         <th class="px-4 py-3 font-medium">{{ __('Workshop ID') }}</th>
                         <th class="px-4 py-3 font-medium">{{ __('Name') }}</th>
-                        <th class="px-4 py-3 font-medium">{{ __('Size') }}</th>
                         <th class="px-4 py-3 font-medium">
-                            <button wire:click="toggleSortStatus" class="flex items-center gap-1 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">
-                                {{ __('Status') }}
-                                @if ($sortStatus === 'asc')
-                                    <flux:icon name="chevron-up" class="size-3.5" />
-                                @elseif ($sortStatus === 'desc')
-                                    <flux:icon name="chevron-down" class="size-3.5" />
+                            <button wire:click="toggleSort('file_size')" class="flex items-center gap-1 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">
+                                {{ __('Size') }}
+                                @if ($sortBy === 'file_size')
+                                    <flux:icon name="{{ $sortDirection === 'asc' ? 'chevron-up' : 'chevron-down' }}" class="size-3.5" />
                                 @else
                                     <flux:icon name="chevron-up-down" class="size-3.5 opacity-40" />
                                 @endif
                             </button>
                         </th>
-                        <th class="px-4 py-3 font-medium">{{ __('Workshop Updated') }}</th>
-                        <th class="px-4 py-3 font-medium">{{ __('Installed') }}</th>
+                        <th class="px-4 py-3 font-medium">
+                            <button wire:click="toggleSort('status')" class="flex items-center gap-1 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">
+                                {{ __('Status') }}
+                                @if ($sortBy === 'status')
+                                    <flux:icon name="{{ $sortDirection === 'asc' ? 'chevron-up' : 'chevron-down' }}" class="size-3.5" />
+                                @else
+                                    <flux:icon name="chevron-up-down" class="size-3.5 opacity-40" />
+                                @endif
+                            </button>
+                        </th>
+                        <th class="px-4 py-3 font-medium">
+                            <button wire:click="toggleSort('steam_updated_at')" class="flex items-center gap-1 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">
+                                {{ __('Workshop Updated') }}
+                                @if ($sortBy === 'steam_updated_at')
+                                    <flux:icon name="{{ $sortDirection === 'asc' ? 'chevron-up' : 'chevron-down' }}" class="size-3.5" />
+                                @else
+                                    <flux:icon name="chevron-up-down" class="size-3.5 opacity-40" />
+                                @endif
+                            </button>
+                        </th>
+                        <th class="px-4 py-3 font-medium">
+                            <button wire:click="toggleSort('installed_at')" class="flex items-center gap-1 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">
+                                {{ __('Installed') }}
+                                @if ($sortBy === 'installed_at')
+                                    <flux:icon name="{{ $sortDirection === 'asc' ? 'chevron-up' : 'chevron-down' }}" class="size-3.5" />
+                                @else
+                                    <flux:icon name="chevron-up-down" class="size-3.5 opacity-40" />
+                                @endif
+                            </button>
+                        </th>
                         <th class="px-4 py-3 font-medium">{{ __('Actions') }}</th>
                     </tr>
                 </thead>

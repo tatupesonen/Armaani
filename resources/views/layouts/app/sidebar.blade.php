@@ -101,6 +101,8 @@
 
         {{ $slot }}
 
+        <x-toast-manager />
+
         @fluxScripts
     </body>
 </html>

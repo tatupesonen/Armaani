@@ -25,7 +25,7 @@ class DetectServerBootedTest extends TestCase
     {
         Event::fake([ServerStatusChanged::class]);
 
-        $server = Server::factory()->create(['status' => ServerStatus::Booting]);
+        $server = Server::factory()->create(['name' => 'Boot Test', 'status' => ServerStatus::Booting]);
 
         $listener = new DetectServerBooted;
         $listener->handle(new ServerLogOutput($server->id, '15:42:30 Connected to Steam servers'));
@@ -33,7 +33,9 @@ class DetectServerBootedTest extends TestCase
         $this->assertEquals(ServerStatus::Running, $server->fresh()->status);
 
         Event::assertDispatched(ServerStatusChanged::class, function (ServerStatusChanged $event) use ($server) {
-            return $event->serverId === $server->id && $event->status === 'running';
+            return $event->serverId === $server->id
+                && $event->status === 'running'
+                && $event->serverName === 'Boot Test';
         });
     }
 

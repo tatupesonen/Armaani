@@ -2,6 +2,7 @@
 
 use App\Enums\InstallationStatus;
 use App\Enums\ServerStatus;
+use App\Events\ServerStatusChanged;
 use App\Jobs\StartServerJob;
 use App\Jobs\StopServerJob;
 use App\Livewire\Concerns\AuditsActions;
@@ -264,6 +265,7 @@ new #[Title('Servers')] class extends Component
     {
         $server->update(['status' => ServerStatus::Starting]);
         StartServerJob::dispatch($server);
+        ServerStatusChanged::dispatch($server->id, ServerStatus::Starting->value, $server->name);
         $this->auditLog("queued start for server '{$server->name}'");
     }
 
@@ -271,6 +273,7 @@ new #[Title('Servers')] class extends Component
     {
         $server->update(['status' => ServerStatus::Stopping]);
         StopServerJob::dispatch($server);
+        ServerStatusChanged::dispatch($server->id, ServerStatus::Stopping->value, $server->name);
         $this->auditLog("queued stop for server '{$server->name}'");
     }
 
@@ -278,6 +281,7 @@ new #[Title('Servers')] class extends Component
     {
         $server->update(['status' => ServerStatus::Stopping]);
         StartServerJob::dispatch($server, restart: true);
+        ServerStatusChanged::dispatch($server->id, ServerStatus::Stopping->value, $server->name);
         $this->auditLog("queued restart for server '{$server->name}'");
     }
 
@@ -429,7 +433,7 @@ new #[Title('Servers')] class extends Component
         $this->showCreateModal = false;
         unset($this->servers);
 
-        session()->flash('status', "Server '{$validated['createName']}' created successfully.");
+        $this->dispatch('toast', message: "Server '{$validated['createName']}' created successfully.", variant: 'success');
     }
 
     // --- Inline edit ---
@@ -666,7 +670,7 @@ new #[Title('Servers')] class extends Component
         $this->editingServerId = null;
         unset($this->servers);
 
-        session()->flash('status', "Server '{$validated['editName']}' updated successfully.");
+        $this->dispatch('toast', message: "Server '{$validated['editName']}' updated successfully.", variant: 'success');
     }
 
     // --- Backups ---
@@ -685,9 +689,9 @@ new #[Title('Servers')] class extends Component
 
         if ($backup) {
             $this->auditLog("created backup for server '{$server->name}'");
-            session()->flash('backup-status-'.$server->id, __('Backup created successfully.'));
+            $this->dispatch('toast', message: __('Backup created successfully.'), variant: 'success');
         } else {
-            session()->flash('backup-error-'.$server->id, __('No .vars.Arma3Profile file found for this server. Start the server at least once first.'));
+            $this->dispatch('toast', message: __('No .vars.Arma3Profile file found for this server. Start the server at least once first.'), variant: 'danger');
         }
     }
 
@@ -710,7 +714,7 @@ new #[Title('Servers')] class extends Component
         $this->backupUploadFile = null;
         $this->backupUploadName = '';
 
-        session()->flash('backup-status-'.$server->id, __('Backup uploaded successfully.'));
+        $this->dispatch('toast', message: __('Backup uploaded successfully.'), variant: 'success');
     }
 
     public function confirmRestore(int $backupId): void
@@ -729,7 +733,7 @@ new #[Title('Servers')] class extends Component
         $server = $backup->server;
 
         if ($this->getStatus($server) !== 'stopped') {
-            session()->flash('backup-error-'.$server->id, __('Cannot restore while the server is running. Stop it first.'));
+            $this->dispatch('toast', message: __('Cannot restore while the server is running. Stop it first.'), variant: 'danger');
             $this->confirmingRestore = false;
             $this->restoringBackupId = null;
 
@@ -743,7 +747,7 @@ new #[Title('Servers')] class extends Component
         $this->confirmingRestore = false;
         $this->restoringBackupId = null;
 
-        session()->flash('backup-status-'.$server->id, __('Backup restored successfully.'));
+        $this->dispatch('toast', message: __('Backup restored successfully.'), variant: 'success');
     }
 
     public function deleteBackup(ServerBackup $backup): void
@@ -754,7 +758,7 @@ new #[Title('Servers')] class extends Component
 
         $this->auditLog("deleted backup #{$backupId} from server '{$server->name}'");
 
-        session()->flash('backup-status-'.$server->id, __('Backup deleted.'));
+        $this->dispatch('toast', message: __('Backup deleted.'), variant: 'success');
     }
 }; ?>
 
@@ -768,12 +772,6 @@ new #[Title('Servers')] class extends Component
             {{ __('New Server') }}
         </flux:button>
     </div>
-
-    @if (session('status'))
-        <flux:callout variant="success" class="mb-4">
-            {{ session('status') }}
-        </flux:callout>
-    @endif
 
     @if ($this->servers->isEmpty())
         <flux:callout>
@@ -1145,18 +1143,6 @@ new #[Title('Servers')] class extends Component
                                         <flux:icon.chevron-down class="size-4 text-zinc-400 transition-transform duration-200" ::class="open && 'rotate-180'" />
                                     </button>
                                     <div x-show="open" x-transition.opacity.duration.200ms class="border-t border-zinc-200 px-4 py-4 dark:border-zinc-700">
-                                        @if (session('backup-status-'.$server->id))
-                                            <flux:callout variant="success" class="mb-4">
-                                                {{ session('backup-status-'.$server->id) }}
-                                            </flux:callout>
-                                        @endif
-
-                                        @if (session('backup-error-'.$server->id))
-                                            <flux:callout variant="danger" class="mb-4">
-                                                {{ session('backup-error-'.$server->id) }}
-                                            </flux:callout>
-                                        @endif
-
                                         {{-- Create backup from current state --}}
                                         <div class="flex items-end gap-3 mb-4">
                                             <div class="flex-1 max-w-xs">

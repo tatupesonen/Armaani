@@ -28,8 +28,9 @@ class DetectServerBooted
             ->update(['status' => ServerStatus::Running]);
 
         if ($updated) {
+            $serverName = Server::query()->where('id', $event->serverId)->value('name') ?? 'Server';
             Log::info("[Server:{$event->serverId}] Connected to Steam servers — status changed from Booting to Running");
-            ServerStatusChanged::dispatch($event->serverId, ServerStatus::Running->value);
+            ServerStatusChanged::dispatch($event->serverId, ServerStatus::Running->value, $serverName);
         }
     }
 }

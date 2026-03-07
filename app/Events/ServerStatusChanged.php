@@ -14,6 +14,7 @@ class ServerStatusChanged implements ShouldBroadcastNow
     public function __construct(
         public int $serverId,
         public string $status,
+        public string $serverName = '',
     ) {}
 
     public function broadcastOn(): Channel

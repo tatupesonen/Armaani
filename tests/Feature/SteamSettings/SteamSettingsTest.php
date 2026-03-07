@@ -45,7 +45,7 @@ class SteamSettingsTest extends TestCase
             ->set('password', 'supersecret')
             ->call('saveCredentials')
             ->assertHasNoErrors()
-            ->assertDispatched('credentials-saved');
+            ->assertDispatched('toast', message: 'Credentials saved.', variant: 'success');
 
         $account = SteamAccount::latest()->first();
         $this->assertNotNull($account);
@@ -116,7 +116,7 @@ class SteamSettingsTest extends TestCase
             ->set('steam_api_key', 'ABCDEF1234567890')
             ->call('saveApiKey')
             ->assertHasNoErrors()
-            ->assertDispatched('api-key-saved');
+            ->assertDispatched('toast', message: 'API key saved.', variant: 'success');
 
         $account = SteamAccount::latest()->first();
         $this->assertNotNull($account);
@@ -329,7 +329,7 @@ class SteamSettingsTest extends TestCase
             ->set('mod_download_batch_size', 10)
             ->call('saveSettings')
             ->assertHasNoErrors()
-            ->assertDispatched('settings-saved');
+            ->assertDispatched('toast', message: 'Download settings saved.', variant: 'success');
 
         $account = SteamAccount::latest()->first();
         $this->assertNotNull($account);

@@ -17,6 +17,13 @@ new #[Title('Mod Presets')] class extends Component
 
     public bool $showImportModal = false;
 
+    public function mount(): void
+    {
+        if (session('status')) {
+            $this->dispatch('toast', message: session('status'), variant: 'success');
+        }
+    }
+
     #[Computed]
     public function presets()
     {
@@ -35,7 +42,7 @@ new #[Title('Mod Presets')] class extends Component
             $preset = app(PresetImportService::class)->importFromHtml($htmlContent);
 
             $this->auditLog("imported preset '{$preset->name}' with {$preset->mods()->count()} mods");
-            session()->flash('status', "Preset '{$preset->name}' imported. Mod downloads have been queued.");
+            $this->dispatch('toast', message: "Preset '{$preset->name}' imported. Mod downloads have been queued.", variant: 'success');
         } catch (\InvalidArgumentException $e) {
             $this->addError('importFile', $e->getMessage());
 
@@ -70,12 +77,6 @@ new #[Title('Mod Presets')] class extends Component
             </flux:button>
         </div>
     </div>
-
-    @if (session('status'))
-        <flux:callout variant="success" class="mb-4">
-            {{ session('status') }}
-        </flux:callout>
-    @endif
 
     @if ($this->presets->isEmpty())
         <flux:callout>

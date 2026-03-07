@@ -71,7 +71,7 @@ new #[Title('Steam Settings')] class extends Component
         $this->password = '';
         $this->loginVerified = null;
         $this->loginError = null;
-        $this->dispatch('credentials-saved');
+        $this->dispatch('toast', message: __('Credentials saved.'), variant: 'success');
     }
 
     public function saveApiKey(): void
@@ -96,7 +96,7 @@ new #[Title('Steam Settings')] class extends Component
 
         $this->apiKeyVerified = null;
         $this->apiKeyError = null;
-        $this->dispatch('api-key-saved');
+        $this->dispatch('toast', message: __('API key saved.'), variant: 'success');
     }
 
     public function saveSettings(): void
@@ -117,7 +117,7 @@ new #[Title('Steam Settings')] class extends Component
 
         $this->auditLog('updated download settings');
 
-        $this->dispatch('settings-saved');
+        $this->dispatch('toast', message: __('Download settings saved.'), variant: 'success');
     }
 
     public function verifyLogin(): void
@@ -205,9 +205,7 @@ new #[Title('Steam Settings')] class extends Component
                 <flux:button variant="primary" type="submit">
                     {{ __('Save Credentials') }}
                 </flux:button>
-                <x-action-message on="credentials-saved">
-                    {{ __('Saved.') }}
-                </x-action-message>
+
             </div>
         </form>
 
@@ -238,9 +236,7 @@ new #[Title('Steam Settings')] class extends Component
                 <flux:button variant="primary" type="submit">
                     {{ __('Save API Key') }}
                 </flux:button>
-                <x-action-message on="api-key-saved">
-                    {{ __('Saved.') }}
-                </x-action-message>
+
             </div>
         </form>
 
@@ -265,9 +261,7 @@ new #[Title('Steam Settings')] class extends Component
                 <flux:button variant="primary" type="submit">
                     {{ __('Save Settings') }}
                 </flux:button>
-                <x-action-message on="settings-saved">
-                    {{ __('Saved.') }}
-                </x-action-message>
+
             </div>
         </form>
     </div>

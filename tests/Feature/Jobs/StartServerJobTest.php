@@ -3,10 +3,12 @@
 namespace Tests\Feature\Jobs;
 
 use App\Enums\ServerStatus;
+use App\Events\ServerStatusChanged;
 use App\Jobs\StartServerJob;
 use App\Models\Server;
 use App\Services\ServerProcessService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Mockery;
 use Tests\TestCase;
 
@@ -16,7 +18,9 @@ class StartServerJobTest extends TestCase
 
     public function test_start_job_calls_service_and_sets_booting_status(): void
     {
-        $server = Server::factory()->create(['status' => ServerStatus::Starting]);
+        Event::fake([ServerStatusChanged::class]);
+
+        $server = Server::factory()->create(['name' => 'Test Server', 'status' => ServerStatus::Starting]);
 
         $service = Mockery::mock(ServerProcessService::class);
         $service->shouldReceive('start')->once()->with(Mockery::on(fn ($s) => $s->id === $server->id));
@@ -26,11 +30,19 @@ class StartServerJobTest extends TestCase
         (new StartServerJob($server))->handle($service);
 
         $this->assertEquals(ServerStatus::Booting, $server->fresh()->status);
+
+        Event::assertDispatched(ServerStatusChanged::class, function (ServerStatusChanged $event) use ($server) {
+            return $event->serverId === $server->id
+                && $event->status === 'booting'
+                && $event->serverName === 'Test Server';
+        });
     }
 
     public function test_start_job_sets_stopped_when_process_fails_to_start(): void
     {
-        $server = Server::factory()->create(['status' => ServerStatus::Starting]);
+        Event::fake([ServerStatusChanged::class]);
+
+        $server = Server::factory()->create(['name' => 'Fail Server', 'status' => ServerStatus::Starting]);
 
         $service = Mockery::mock(ServerProcessService::class);
         $service->shouldReceive('start')->once();
@@ -40,11 +52,19 @@ class StartServerJobTest extends TestCase
         (new StartServerJob($server))->handle($service);
 
         $this->assertEquals(ServerStatus::Stopped, $server->fresh()->status);
+
+        Event::assertDispatched(ServerStatusChanged::class, function (ServerStatusChanged $event) use ($server) {
+            return $event->serverId === $server->id
+                && $event->status === 'stopped'
+                && $event->serverName === 'Fail Server';
+        });
     }
 
     public function test_restart_job_stops_then_starts_server(): void
     {
-        $server = Server::factory()->create(['status' => ServerStatus::Stopping]);
+        Event::fake([ServerStatusChanged::class]);
+
+        $server = Server::factory()->create(['name' => 'Restart Server', 'status' => ServerStatus::Stopping]);
 
         $service = Mockery::mock(ServerProcessService::class);
         $service->shouldReceive('getRunningHeadlessClientCount')->once()->andReturn(0);
@@ -57,10 +77,16 @@ class StartServerJobTest extends TestCase
         (new StartServerJob($server, restart: true))->handle($service);
 
         $this->assertEquals(ServerStatus::Booting, $server->fresh()->status);
+
+        Event::assertDispatched(ServerStatusChanged::class, function (ServerStatusChanged $event) use ($server) {
+            return $event->serverId === $server->id && $event->status === 'booting';
+        });
     }
 
     public function test_restart_job_restores_headless_clients(): void
     {
+        Event::fake([ServerStatusChanged::class]);
+
         $server = Server::factory()->create(['status' => ServerStatus::Stopping]);
 
         $service = Mockery::mock(ServerProcessService::class);
@@ -79,6 +105,8 @@ class StartServerJobTest extends TestCase
 
     public function test_restart_job_does_not_restore_headless_clients_on_failed_start(): void
     {
+        Event::fake([ServerStatusChanged::class]);
+
         $server = Server::factory()->create(['status' => ServerStatus::Stopping]);
 
         $service = Mockery::mock(ServerProcessService::class);
@@ -97,11 +125,19 @@ class StartServerJobTest extends TestCase
 
     public function test_failed_method_sets_stopped_status(): void
     {
-        $server = Server::factory()->create(['status' => ServerStatus::Starting]);
+        Event::fake([ServerStatusChanged::class]);
+
+        $server = Server::factory()->create(['name' => 'Failed Server', 'status' => ServerStatus::Starting]);
 
         $job = new StartServerJob($server);
         $job->failed(new \RuntimeException('Something went wrong'));
 
         $this->assertEquals(ServerStatus::Stopped, $server->fresh()->status);
+
+        Event::assertDispatched(ServerStatusChanged::class, function (ServerStatusChanged $event) use ($server) {
+            return $event->serverId === $server->id
+                && $event->status === 'stopped'
+                && $event->serverName === 'Failed Server';
+        });
     }
 }

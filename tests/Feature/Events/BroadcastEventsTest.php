@@ -94,6 +94,7 @@ class BroadcastEventsTest extends TestCase
         $event = new ServerStatusChanged(
             serverId: 3,
             status: 'running',
+            serverName: 'My Server',
         );
 
         $channel = $event->broadcastOn();
@@ -107,9 +108,21 @@ class BroadcastEventsTest extends TestCase
         $event = new ServerStatusChanged(
             serverId: 5,
             status: 'booting',
+            serverName: 'Test Server',
         );
 
         $this->assertEquals(5, $event->serverId);
         $this->assertEquals('booting', $event->status);
+        $this->assertEquals('Test Server', $event->serverName);
+    }
+
+    public function test_server_status_changed_server_name_defaults_to_empty_string(): void
+    {
+        $event = new ServerStatusChanged(
+            serverId: 1,
+            status: 'running',
+        );
+
+        $this->assertEquals('', $event->serverName);
     }
 }

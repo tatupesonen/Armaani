@@ -77,7 +77,7 @@ new #[Title('Missions')] class extends Component
 
         if ($uploaded > 0) {
             $this->auditLog("uploaded {$uploaded} mission file(s)");
-            session()->flash('mission-success', __(':count mission(s) uploaded successfully.', ['count' => $uploaded]));
+            $this->dispatch('toast', message: __(':count mission(s) uploaded successfully.', ['count' => $uploaded]), variant: 'success');
         }
     }
 
@@ -139,12 +139,6 @@ new #[Title('Missions')] class extends Component
             <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{{ __('Uploading files to server...') }}</p>
         </div>
     </form>
-
-    @if (session('mission-success'))
-        <flux:callout variant="success" class="mb-4">
-            {{ session('mission-success') }}
-        </flux:callout>
-    @endif
 
     @php $missionList = $this->listMissions(); @endphp
 

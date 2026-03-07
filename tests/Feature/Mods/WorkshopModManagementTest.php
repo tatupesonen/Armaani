@@ -572,7 +572,7 @@ class WorkshopModManagementTest extends TestCase
 
         Livewire::test('pages::mods.index')
             ->call('checkForUpdates')
-            ->assertSee('1 mod(s) have updates available.');
+            ->assertDispatched('toast', message: '1 mod(s) have updates available.', variant: 'info');
     }
 
     public function test_check_for_updates_shows_up_to_date_message(): void
@@ -598,7 +598,7 @@ class WorkshopModManagementTest extends TestCase
 
         Livewire::test('pages::mods.index')
             ->call('checkForUpdates')
-            ->assertSee('All mods are up to date.');
+            ->assertDispatched('toast', message: 'All mods are up to date.', variant: 'success');
     }
 
     public function test_check_for_updates_only_checks_installed_mods(): void
@@ -717,6 +717,152 @@ class WorkshopModManagementTest extends TestCase
         Livewire::test('pages::mods.index')
             ->assertSee('Jan 10, 2026 08:00')
             ->assertSee('Jan 15, 2026 10:30');
+    }
+
+    public function test_summary_shows_installed_count_and_total_size(): void
+    {
+        $this->actingAs($this->user);
+
+        WorkshopMod::factory()->installed()->create(['file_size' => 1073741824]); // 1 GB
+        WorkshopMod::factory()->installed()->create(['file_size' => 2147483648]); // 2 GB
+        WorkshopMod::factory()->failed()->create(['file_size' => 500000000]);
+
+        $this->mockWorkshopService();
+
+        Livewire::test('pages::mods.index')
+            ->assertSee('2 installed')
+            ->assertSee('3.00 GB total');
+    }
+
+    public function test_summary_not_shown_when_no_installed_mods(): void
+    {
+        $this->actingAs($this->user);
+
+        WorkshopMod::factory()->failed()->create();
+
+        $this->mockWorkshopService();
+
+        Livewire::test('pages::mods.index')
+            ->assertDontSee('installed,');
+    }
+
+    public function test_summary_shows_mb_for_small_totals(): void
+    {
+        $this->actingAs($this->user);
+
+        WorkshopMod::factory()->installed()->create(['file_size' => 524288000]); // 500 MB
+
+        $this->mockWorkshopService();
+
+        Livewire::test('pages::mods.index')
+            ->assertSee('1 installed')
+            ->assertSee('500.0 MB total');
+    }
+
+    public function test_sort_by_size_ascending(): void
+    {
+        $this->actingAs($this->user);
+
+        WorkshopMod::factory()->installed()->create(['name' => 'Large Mod', 'file_size' => 9000000]);
+        WorkshopMod::factory()->installed()->create(['name' => 'Small Mod', 'file_size' => 1000000]);
+        WorkshopMod::factory()->installed()->create(['name' => 'Medium Mod', 'file_size' => 5000000]);
+
+        $this->mockWorkshopService();
+
+        $component = Livewire::test('pages::mods.index')
+            ->call('toggleSort', 'file_size')
+            ->assertSet('sortBy', 'file_size')
+            ->assertSet('sortDirection', 'asc');
+
+        $html = $component->html();
+        $this->assertLessThan(strpos($html, 'Medium Mod'), strpos($html, 'Small Mod'));
+        $this->assertLessThan(strpos($html, 'Large Mod'), strpos($html, 'Medium Mod'));
+    }
+
+    public function test_sort_by_size_descending(): void
+    {
+        $this->actingAs($this->user);
+
+        WorkshopMod::factory()->installed()->create(['name' => 'Large Mod', 'file_size' => 9000000]);
+        WorkshopMod::factory()->installed()->create(['name' => 'Small Mod', 'file_size' => 1000000]);
+
+        $this->mockWorkshopService();
+
+        Livewire::test('pages::mods.index')
+            ->call('toggleSort', 'file_size')
+            ->call('toggleSort', 'file_size')
+            ->assertSet('sortBy', 'file_size')
+            ->assertSet('sortDirection', 'desc');
+    }
+
+    public function test_sort_by_installed_at(): void
+    {
+        $this->actingAs($this->user);
+
+        WorkshopMod::factory()->installed()->create(['name' => 'Old Mod', 'installed_at' => '2025-01-01']);
+        WorkshopMod::factory()->installed()->create(['name' => 'New Mod', 'installed_at' => '2026-06-01']);
+
+        $this->mockWorkshopService();
+
+        $component = Livewire::test('pages::mods.index')
+            ->call('toggleSort', 'installed_at')
+            ->assertSet('sortBy', 'installed_at')
+            ->assertSet('sortDirection', 'asc');
+
+        $html = $component->html();
+        $this->assertLessThan(strpos($html, 'New Mod'), strpos($html, 'Old Mod'));
+    }
+
+    public function test_sort_by_steam_updated_at(): void
+    {
+        $this->actingAs($this->user);
+
+        WorkshopMod::factory()->installed()->create(['name' => 'Stale Mod', 'steam_updated_at' => '2024-01-01']);
+        WorkshopMod::factory()->installed()->create(['name' => 'Fresh Mod', 'steam_updated_at' => '2026-06-01']);
+
+        $this->mockWorkshopService();
+
+        $component = Livewire::test('pages::mods.index')
+            ->call('toggleSort', 'steam_updated_at')
+            ->assertSet('sortBy', 'steam_updated_at')
+            ->assertSet('sortDirection', 'asc');
+
+        $html = $component->html();
+        $this->assertLessThan(strpos($html, 'Fresh Mod'), strpos($html, 'Stale Mod'));
+    }
+
+    public function test_toggle_sort_cycles_asc_desc_reset(): void
+    {
+        $this->actingAs($this->user);
+
+        $this->mockWorkshopService();
+
+        Livewire::test('pages::mods.index')
+            ->assertSet('sortBy', '')
+            ->call('toggleSort', 'file_size')
+            ->assertSet('sortBy', 'file_size')
+            ->assertSet('sortDirection', 'asc')
+            ->call('toggleSort', 'file_size')
+            ->assertSet('sortBy', 'file_size')
+            ->assertSet('sortDirection', 'desc')
+            ->call('toggleSort', 'file_size')
+            ->assertSet('sortBy', '')
+            ->assertSet('sortDirection', 'asc');
+    }
+
+    public function test_toggle_sort_switching_column_resets_direction(): void
+    {
+        $this->actingAs($this->user);
+
+        $this->mockWorkshopService();
+
+        Livewire::test('pages::mods.index')
+            ->call('toggleSort', 'file_size')
+            ->call('toggleSort', 'file_size') // now desc
+            ->assertSet('sortDirection', 'desc')
+            ->call('toggleSort', 'installed_at') // switch column
+            ->assertSet('sortBy', 'installed_at')
+            ->assertSet('sortDirection', 'asc');
     }
 
     protected function mockWorkshopService(): void
