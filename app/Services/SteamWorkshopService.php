@@ -10,7 +10,7 @@ class SteamWorkshopService
     /**
      * Fetch mod metadata from the Steam Web API.
      *
-     * @return array{name: string|null, file_size: int|null}|null
+     * @return array{name: string|null, file_size: int|null, time_updated: int|null}|null
      */
     public function getModDetails(int $workshopId): ?array
     {
@@ -21,7 +21,7 @@ class SteamWorkshopService
      * Fetch metadata for multiple mods in a single Steam API call.
      *
      * @param  list<int>  $workshopIds
-     * @return array<int, array{name: string|null, file_size: int|null}>
+     * @return array<int, array{name: string|null, file_size: int|null, time_updated: int|null}>
      */
     public function getMultipleModDetails(array $workshopIds): array
     {
@@ -58,6 +58,7 @@ class SteamWorkshopService
                 $results[$workshopId] = [
                     'name' => $detail['title'] ?? null,
                     'file_size' => isset($detail['file_size']) ? (int) $detail['file_size'] : null,
+                    'time_updated' => isset($detail['time_updated']) ? (int) $detail['time_updated'] : null,
                 ];
             }
         }

@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Models\WorkshopMod;
 use App\Services\SteamWorkshopService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 use Mockery;
@@ -22,11 +23,23 @@ class WorkshopModManagementTest extends TestCase
 
     protected User $user;
 
+    private string $testModsBasePath;
+
     protected function setUp(): void
     {
         parent::setUp();
 
+        $this->testModsBasePath = sys_get_temp_dir().'/armaman_test_mods_'.uniqid();
+        config(['arma.mods_base_path' => $this->testModsBasePath]);
+
         $this->user = User::factory()->create();
+    }
+
+    protected function tearDown(): void
+    {
+        File::deleteDirectory($this->testModsBasePath);
+
+        parent::tearDown();
     }
 
     public function test_mods_page_requires_authentication(): void
@@ -508,6 +521,202 @@ class WorkshopModManagementTest extends TestCase
             ->set('search', '')
             ->assertSee('ACE3')
             ->assertSee('CBA_A3');
+    }
+
+    public function test_check_for_updates_fetches_steam_updated_at(): void
+    {
+        $this->actingAs($this->user);
+
+        $mod = WorkshopMod::factory()->installed()->create(['workshop_id' => 463939057]);
+
+        $mock = Mockery::mock(SteamWorkshopService::class);
+        $mock->shouldReceive('getMultipleModDetails')
+            ->once()
+            ->andReturn([
+                463939057 => [
+                    'name' => $mod->name,
+                    'file_size' => $mod->file_size,
+                    'time_updated' => 1700000000,
+                ],
+            ]);
+        $this->app->instance(SteamWorkshopService::class, $mock);
+
+        Livewire::test('pages::mods.index')
+            ->call('checkForUpdates');
+
+        $mod->refresh();
+        $this->assertNotNull($mod->steam_updated_at);
+        $this->assertEquals(1700000000, $mod->steam_updated_at->timestamp);
+    }
+
+    public function test_check_for_updates_shows_outdated_count(): void
+    {
+        $this->actingAs($this->user);
+
+        $mod = WorkshopMod::factory()->installed()->create([
+            'workshop_id' => 463939057,
+            'installed_at' => now()->subDays(3),
+        ]);
+
+        $mock = Mockery::mock(SteamWorkshopService::class);
+        $mock->shouldReceive('getMultipleModDetails')
+            ->once()
+            ->andReturn([
+                463939057 => [
+                    'name' => $mod->name,
+                    'file_size' => $mod->file_size,
+                    'time_updated' => now()->timestamp,
+                ],
+            ]);
+        $this->app->instance(SteamWorkshopService::class, $mock);
+
+        Livewire::test('pages::mods.index')
+            ->call('checkForUpdates')
+            ->assertSee('1 mod(s) have updates available.');
+    }
+
+    public function test_check_for_updates_shows_up_to_date_message(): void
+    {
+        $this->actingAs($this->user);
+
+        $mod = WorkshopMod::factory()->installed()->create([
+            'workshop_id' => 463939057,
+            'installed_at' => now(),
+        ]);
+
+        $mock = Mockery::mock(SteamWorkshopService::class);
+        $mock->shouldReceive('getMultipleModDetails')
+            ->once()
+            ->andReturn([
+                463939057 => [
+                    'name' => $mod->name,
+                    'file_size' => $mod->file_size,
+                    'time_updated' => now()->subDay()->timestamp,
+                ],
+            ]);
+        $this->app->instance(SteamWorkshopService::class, $mock);
+
+        Livewire::test('pages::mods.index')
+            ->call('checkForUpdates')
+            ->assertSee('All mods are up to date.');
+    }
+
+    public function test_check_for_updates_only_checks_installed_mods(): void
+    {
+        $this->actingAs($this->user);
+
+        WorkshopMod::factory()->failed()->create(['workshop_id' => 100]);
+        WorkshopMod::factory()->create(['workshop_id' => 200]); // queued
+
+        $mock = Mockery::mock(SteamWorkshopService::class);
+        $mock->shouldNotReceive('getMultipleModDetails');
+        $this->app->instance(SteamWorkshopService::class, $mock);
+
+        Livewire::test('pages::mods.index')
+            ->call('checkForUpdates');
+    }
+
+    public function test_outdated_mods_display_update_available_badge(): void
+    {
+        $this->actingAs($this->user);
+
+        WorkshopMod::factory()->outdated()->create(['name' => 'Outdated Mod']);
+
+        $this->mockWorkshopService();
+
+        Livewire::test('pages::mods.index')
+            ->assertSee('Update available');
+    }
+
+    public function test_up_to_date_mods_do_not_display_update_available_badge(): void
+    {
+        $this->actingAs($this->user);
+
+        WorkshopMod::factory()->installed()->create(['name' => 'Fresh Mod']);
+
+        $this->mockWorkshopService();
+
+        Livewire::test('pages::mods.index')
+            ->assertDontSee('Update available');
+    }
+
+    public function test_update_all_outdated_queues_jobs_for_outdated_mods_only(): void
+    {
+        Queue::fake();
+
+        $this->actingAs($this->user);
+
+        SteamAccount::factory()->create(['mod_download_batch_size' => 5]);
+
+        $outdated = WorkshopMod::factory()->outdated()->create();
+        $upToDate = WorkshopMod::factory()->installed()->create();
+
+        $this->mockWorkshopService();
+
+        Livewire::test('pages::mods.index')
+            ->call('updateAllOutdated');
+
+        Queue::assertPushed(DownloadModJob::class, 1);
+        Queue::assertPushed(DownloadModJob::class, function (DownloadModJob $job) use ($outdated) {
+            return $job->mod->id === $outdated->id;
+        });
+
+        $this->assertEquals(InstallationStatus::Queued, $outdated->fresh()->installation_status);
+        $this->assertEquals(InstallationStatus::Installed, $upToDate->fresh()->installation_status);
+    }
+
+    public function test_update_all_outdated_does_nothing_when_no_outdated_mods(): void
+    {
+        Queue::fake();
+
+        $this->actingAs($this->user);
+
+        WorkshopMod::factory()->installed()->create();
+
+        $this->mockWorkshopService();
+
+        Livewire::test('pages::mods.index')
+            ->call('updateAllOutdated');
+
+        Queue::assertNotPushed(DownloadModJob::class);
+        Queue::assertNotPushed(BatchDownloadModsJob::class);
+    }
+
+    public function test_update_all_outdated_respects_batch_size(): void
+    {
+        Queue::fake();
+
+        $this->actingAs($this->user);
+
+        SteamAccount::factory()->create(['mod_download_batch_size' => 2]);
+
+        WorkshopMod::factory()->outdated()->count(5)->create();
+
+        $this->mockWorkshopService();
+
+        Livewire::test('pages::mods.index')
+            ->call('updateAllOutdated');
+
+        // 5 mods with batch size 2 → 2 BatchDownloadModsJobs (2+2) + 1 DownloadModJob (1)
+        Queue::assertPushed(BatchDownloadModsJob::class, 2);
+        Queue::assertPushed(DownloadModJob::class, 1);
+    }
+
+    public function test_mods_page_displays_steam_updated_at_and_installed_at(): void
+    {
+        $this->actingAs($this->user);
+
+        WorkshopMod::factory()->installed()->create([
+            'name' => 'Date Test Mod',
+            'installed_at' => '2026-01-15 10:30:00',
+            'steam_updated_at' => '2026-01-10 08:00:00',
+        ]);
+
+        $this->mockWorkshopService();
+
+        Livewire::test('pages::mods.index')
+            ->assertSee('Jan 10, 2026 08:00')
+            ->assertSee('Jan 15, 2026 10:30');
     }
 
     protected function mockWorkshopService(): void

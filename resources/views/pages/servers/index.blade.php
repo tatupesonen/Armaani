@@ -152,6 +152,29 @@ new #[Title('Servers')] class extends Component
 
     public string $editPrecisionAi = '0.50';
 
+    // Network settings (edit only — created with defaults on server create)
+    public int $editMaxMsgSend = 128;
+
+    public int $editMaxSizeGuaranteed = 512;
+
+    public int $editMaxSizeNonguaranteed = 256;
+
+    public string $editMinBandwidth = '131072';
+
+    public string $editMaxBandwidth = '10000000000';
+
+    public string $editMinErrorToSend = '0.0010';
+
+    public string $editMinErrorToSendNear = '0.0100';
+
+    public int $editMaxPacketSize = 1400;
+
+    public int $editMaxCustomFileSize = 0;
+
+    public string $editTerrainGrid = '25.0000';
+
+    public int $editViewDistance = 0;
+
     // Backup state
     public bool $confirmingRestore = false;
 
@@ -399,6 +422,7 @@ new #[Title('Servers')] class extends Component
         ]);
 
         $server->difficultySettings()->create([]);
+        $server->networkSettings()->create([]);
 
         $this->auditLog("created server '{$validated['createName']}' (port: {$validated['createPort']})");
 
@@ -455,6 +479,19 @@ new #[Title('Servers')] class extends Component
         $this->editSkillAi = (string) $difficulty->skill_ai;
         $this->editPrecisionAi = (string) $difficulty->precision_ai;
 
+        $network = $server->networkSettings ?? $server->networkSettings()->create([])->refresh();
+        $this->editMaxMsgSend = $network->max_msg_send;
+        $this->editMaxSizeGuaranteed = $network->max_size_guaranteed;
+        $this->editMaxSizeNonguaranteed = $network->max_size_nonguaranteed;
+        $this->editMinBandwidth = (string) $network->min_bandwidth;
+        $this->editMaxBandwidth = (string) $network->max_bandwidth;
+        $this->editMinErrorToSend = (string) $network->min_error_to_send;
+        $this->editMinErrorToSendNear = (string) $network->min_error_to_send_near;
+        $this->editMaxPacketSize = $network->max_packet_size;
+        $this->editMaxCustomFileSize = $network->max_custom_file_size;
+        $this->editTerrainGrid = (string) $network->terrain_grid;
+        $this->editViewDistance = $network->view_distance;
+
         $this->resetErrorBag();
     }
 
@@ -467,6 +504,42 @@ new #[Title('Servers')] class extends Component
     public function updatedEditPort(int $value): void
     {
         $this->editQueryPort = $value + 1;
+    }
+
+    public function applyNetworkPreset(string $preset): void
+    {
+        $values = match ($preset) {
+            'high_performance' => [
+                'editMaxMsgSend' => 2048,
+                'editMaxSizeGuaranteed' => 512,
+                'editMaxSizeNonguaranteed' => 256,
+                'editMinBandwidth' => '5120000',
+                'editMaxBandwidth' => '104857600',
+                'editMinErrorToSend' => '0.0010',
+                'editMinErrorToSendNear' => '0.0100',
+                'editMaxPacketSize' => 1400,
+                'editMaxCustomFileSize' => 0,
+                'editTerrainGrid' => '3.1250',
+                'editViewDistance' => 0,
+            ],
+            default => [
+                'editMaxMsgSend' => 128,
+                'editMaxSizeGuaranteed' => 512,
+                'editMaxSizeNonguaranteed' => 256,
+                'editMinBandwidth' => '131072',
+                'editMaxBandwidth' => '10000000000',
+                'editMinErrorToSend' => '0.0010',
+                'editMinErrorToSendNear' => '0.0100',
+                'editMaxPacketSize' => 1400,
+                'editMaxCustomFileSize' => 0,
+                'editTerrainGrid' => '25.0000',
+                'editViewDistance' => 0,
+            ],
+        };
+
+        foreach ($values as $key => $value) {
+            $this->{$key} = $value;
+        }
     }
 
     public function saveServer(): void
@@ -513,6 +586,17 @@ new #[Title('Servers')] class extends Component
             'editAiLevelPreset' => ['integer', 'min:0', 'max:3'],
             'editSkillAi' => ['numeric', 'min:0', 'max:1'],
             'editPrecisionAi' => ['numeric', 'min:0', 'max:1'],
+            'editMaxMsgSend' => ['required', 'integer', 'min:1', 'max:10000'],
+            'editMaxSizeGuaranteed' => ['required', 'integer', 'min:1', 'max:4096'],
+            'editMaxSizeNonguaranteed' => ['required', 'integer', 'min:1', 'max:4096'],
+            'editMinBandwidth' => ['required', 'numeric', 'min:0'],
+            'editMaxBandwidth' => ['required', 'numeric', 'min:0'],
+            'editMinErrorToSend' => ['required', 'numeric', 'min:0', 'max:1'],
+            'editMinErrorToSendNear' => ['required', 'numeric', 'min:0', 'max:1'],
+            'editMaxPacketSize' => ['required', 'integer', 'min:256', 'max:1500'],
+            'editMaxCustomFileSize' => ['required', 'integer', 'min:0'],
+            'editTerrainGrid' => ['required', 'numeric', 'min:0'],
+            'editViewDistance' => ['required', 'integer', 'min:0'],
         ], messages: [
             'editPort.unique' => 'This port is already allocated to another server.',
             'editQueryPort.unique' => 'This query port is already allocated to another server.',
@@ -561,6 +645,20 @@ new #[Title('Servers')] class extends Component
             'ai_level_preset' => $validated['editAiLevelPreset'],
             'skill_ai' => $validated['editSkillAi'],
             'precision_ai' => $validated['editPrecisionAi'],
+        ]);
+
+        $server->networkSettings()->updateOrCreate(['server_id' => $server->id], [
+            'max_msg_send' => $validated['editMaxMsgSend'],
+            'max_size_guaranteed' => $validated['editMaxSizeGuaranteed'],
+            'max_size_nonguaranteed' => $validated['editMaxSizeNonguaranteed'],
+            'min_bandwidth' => $validated['editMinBandwidth'],
+            'max_bandwidth' => $validated['editMaxBandwidth'],
+            'min_error_to_send' => $validated['editMinErrorToSend'],
+            'min_error_to_send_near' => $validated['editMinErrorToSendNear'],
+            'max_packet_size' => $validated['editMaxPacketSize'],
+            'max_custom_file_size' => $validated['editMaxCustomFileSize'],
+            'terrain_grid' => $validated['editTerrainGrid'],
+            'view_distance' => $validated['editViewDistance'],
         ]);
 
         $this->auditLog("updated server '{$validated['editName']}'");
@@ -805,242 +903,367 @@ new #[Title('Servers')] class extends Component
                     @if ($editingServerId === $server->id)
                         <div class="border-t border-zinc-200 dark:border-zinc-700 p-4 bg-zinc-50 dark:bg-zinc-800/50">
                             <form wire:submit="saveServer" class="space-y-4">
-                                <flux:input wire:model="editName" :label="__('Server Name')" required />
-
                                 @include('pages.servers.partials.form-fields', ['prefix' => 'edit'])
 
-                                <flux:separator />
-
-                                <flux:heading size="lg">{{ __('Difficulty Settings') }}</flux:heading>
-
-                                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                    {{-- Column 1: Boolean toggles --}}
-                                    <div class="space-y-3">
-                                        <flux:switch wire:model="editReducedDamage" label="{{ __('Reduced damage') }}" />
-                                        <flux:switch wire:model="editStaminaBar" label="{{ __('Stamina bar') }}" />
-                                        <flux:switch wire:model="editWeaponCrosshair" label="{{ __('Weapon crosshair') }}" />
-                                        <flux:switch wire:model="editVisionAid" label="{{ __('Vision aid') }}" />
-                                        <flux:switch wire:model="editCameraShake" label="{{ __('Camera shake') }}" />
-                                        <flux:switch wire:model="editScoreTable" label="{{ __('Score table') }}" />
-                                        <flux:switch wire:model="editDeathMessages" label="{{ __('Killed by') }}" />
-                                        <flux:switch wire:model="editVonId" label="{{ __('VON ID') }}" />
-                                        <flux:switch wire:model="editMapContent" label="{{ __('Extended map content') }}" />
-                                        <flux:switch wire:model="editAutoReport" label="{{ __('Auto report') }}" />
-                                    </div>
-
-                                    {{-- Column 2: Situational awareness + AI --}}
-                                    <div class="space-y-4">
-                                        <flux:radio.group wire:model="editGroupIndicators" label="{{ __('Group indicators') }}" variant="segmented" size="sm">
-                                            <flux:radio value="0" label="{{ __('Never') }}" />
-                                            <flux:radio value="1" label="{{ __('Limited') }}" />
-                                            <flux:radio value="2" label="{{ __('Always') }}" />
-                                        </flux:radio.group>
-
-                                        <flux:radio.group wire:model="editFriendlyTags" label="{{ __('Friendly tags') }}" variant="segmented" size="sm">
-                                            <flux:radio value="0" label="{{ __('Never') }}" />
-                                            <flux:radio value="1" label="{{ __('Limited') }}" />
-                                            <flux:radio value="2" label="{{ __('Always') }}" />
-                                        </flux:radio.group>
-
-                                        <flux:radio.group wire:model="editEnemyTags" label="{{ __('Enemy tags') }}" variant="segmented" size="sm">
-                                            <flux:radio value="0" label="{{ __('Never') }}" />
-                                            <flux:radio value="1" label="{{ __('Limited') }}" />
-                                            <flux:radio value="2" label="{{ __('Always') }}" />
-                                        </flux:radio.group>
-
-                                        <flux:radio.group wire:model="editDetectedMines" label="{{ __('Detected mines') }}" variant="segmented" size="sm">
-                                            <flux:radio value="0" label="{{ __('Never') }}" />
-                                            <flux:radio value="1" label="{{ __('Limited') }}" />
-                                            <flux:radio value="2" label="{{ __('Always') }}" />
-                                        </flux:radio.group>
-
-                                        <flux:separator variant="subtle" />
-
-                                        <flux:radio.group wire:model="editAiLevelPreset" label="{{ __('AI level preset') }}" variant="segmented" size="sm">
-                                            <flux:radio value="0" label="{{ __('Low') }}" />
-                                            <flux:radio value="1" label="{{ __('Normal') }}" />
-                                            <flux:radio value="2" label="{{ __('High') }}" />
-                                            <flux:radio value="3" label="{{ __('Custom') }}" />
-                                        </flux:radio.group>
-
-                                        <div class="grid grid-cols-2 gap-3">
-                                            <flux:input wire:model="editSkillAi" :label="__('AI Skill')" type="number" min="0" max="1" step="0.05" />
-                                            <flux:input wire:model="editPrecisionAi" :label="__('AI Precision')" type="number" min="0" max="1" step="0.05" />
+                                {{-- Difficulty Settings (collapsed by default) --}}
+                                <div x-data="{ open: false }" class="rounded-lg border border-zinc-200 dark:border-zinc-700">
+                                    <button type="button" x-on:click="open = !open" class="flex w-full items-center gap-3 px-4 py-3 text-left">
+                                        <div class="flex-1">
+                                            <span class="text-base font-semibold text-zinc-800 dark:text-white">{{ __('Difficulty Settings') }}</span>
+                                            <span class="block text-xs text-zinc-500 dark:text-zinc-400">{{ __('HUD elements, third-person view, AI behavior, and gameplay options.') }}</span>
                                         </div>
-                                    </div>
+                                        <flux:icon.chevron-down class="size-4 text-zinc-400 transition-transform duration-200" ::class="open && 'rotate-180'" />
+                                    </button>
+                                    <div x-show="open" x-transition.opacity.duration.200ms class="space-y-6 border-t border-zinc-200 px-4 py-4 dark:border-zinc-700">
+                                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                            {{-- Column 1: Boolean toggles --}}
+                                            <div class="space-y-3">
+                                                <flux:switch wire:model="editReducedDamage" label="{{ __('Reduced damage') }}" />
+                                                <flux:switch wire:model="editStaminaBar" label="{{ __('Stamina bar') }}" />
+                                                <flux:switch wire:model="editWeaponCrosshair" label="{{ __('Weapon crosshair') }}" />
+                                                <flux:switch wire:model="editVisionAid" label="{{ __('Vision aid') }}" />
+                                                <flux:switch wire:model="editCameraShake" label="{{ __('Camera shake') }}" />
+                                                <flux:switch wire:model="editScoreTable" label="{{ __('Score table') }}" />
+                                                <flux:switch wire:model="editDeathMessages" label="{{ __('Killed by') }}" />
+                                                <flux:switch wire:model="editVonId" label="{{ __('VON ID') }}" />
+                                                <flux:switch wire:model="editMapContent" label="{{ __('Extended map content') }}" />
+                                                <flux:switch wire:model="editAutoReport" label="{{ __('Auto report') }}" />
+                                            </div>
 
-                                    {{-- Column 3: HUD & view settings --}}
-                                    <div class="space-y-4">
-                                        <flux:radio.group wire:model="editCommands" label="{{ __('Commands') }}" variant="segmented" size="sm">
-                                            <flux:radio value="0" label="{{ __('Never') }}" />
-                                            <flux:radio value="1" label="{{ __('Fade') }}" />
-                                            <flux:radio value="2" label="{{ __('Always') }}" />
-                                        </flux:radio.group>
+                                            {{-- Column 2: Situational awareness + AI --}}
+                                            <div class="space-y-4">
+                                                <flux:radio.group wire:model="editGroupIndicators" label="{{ __('Group indicators') }}" variant="segmented" size="sm">
+                                                    <flux:radio value="0" label="{{ __('Never') }}" />
+                                                    <flux:radio value="1" label="{{ __('Limited') }}" />
+                                                    <flux:radio value="2" label="{{ __('Always') }}" />
+                                                </flux:radio.group>
 
-                                        <flux:radio.group wire:model="editWaypoints" label="{{ __('Waypoints') }}" variant="segmented" size="sm">
-                                            <flux:radio value="0" label="{{ __('Never') }}" />
-                                            <flux:radio value="1" label="{{ __('Fade') }}" />
-                                            <flux:radio value="2" label="{{ __('Always') }}" />
-                                        </flux:radio.group>
+                                                <flux:radio.group wire:model="editFriendlyTags" label="{{ __('Friendly tags') }}" variant="segmented" size="sm">
+                                                    <flux:radio value="0" label="{{ __('Never') }}" />
+                                                    <flux:radio value="1" label="{{ __('Limited') }}" />
+                                                    <flux:radio value="2" label="{{ __('Always') }}" />
+                                                </flux:radio.group>
 
-                                        <flux:radio.group wire:model="editWeaponInfo" label="{{ __('Weapon info') }}" variant="segmented" size="sm">
-                                            <flux:radio value="0" label="{{ __('Never') }}" />
-                                            <flux:radio value="1" label="{{ __('Fade') }}" />
-                                            <flux:radio value="2" label="{{ __('Always') }}" />
-                                        </flux:radio.group>
+                                                <flux:radio.group wire:model="editEnemyTags" label="{{ __('Enemy tags') }}" variant="segmented" size="sm">
+                                                    <flux:radio value="0" label="{{ __('Never') }}" />
+                                                    <flux:radio value="1" label="{{ __('Limited') }}" />
+                                                    <flux:radio value="2" label="{{ __('Always') }}" />
+                                                </flux:radio.group>
 
-                                        <flux:radio.group wire:model="editStanceIndicator" label="{{ __('Stance indicator') }}" variant="segmented" size="sm">
-                                            <flux:radio value="0" label="{{ __('Never') }}" />
-                                            <flux:radio value="1" label="{{ __('Fade') }}" />
-                                            <flux:radio value="2" label="{{ __('Always') }}" />
-                                        </flux:radio.group>
+                                                <flux:radio.group wire:model="editDetectedMines" label="{{ __('Detected mines') }}" variant="segmented" size="sm">
+                                                    <flux:radio value="0" label="{{ __('Never') }}" />
+                                                    <flux:radio value="1" label="{{ __('Limited') }}" />
+                                                    <flux:radio value="2" label="{{ __('Always') }}" />
+                                                </flux:radio.group>
 
-                                        <flux:radio.group wire:model="editThirdPersonView" label="{{ __('Third person view') }}" variant="segmented" size="sm">
-                                            <flux:radio value="0" label="{{ __('Disabled') }}" />
-                                            <flux:radio value="1" label="{{ __('Enabled') }}" />
-                                            <flux:radio value="2" label="{{ __('Vehicles') }}" />
-                                        </flux:radio.group>
+                                                <flux:separator variant="subtle" />
 
-                                        <flux:radio.group wire:model="editTacticalPing" label="{{ __('Tactical ping') }}" variant="segmented" size="sm">
-                                            <flux:radio value="0" label="{{ __('Off') }}" />
-                                            <flux:radio value="1" label="{{ __('3D') }}" />
-                                            <flux:radio value="2" label="{{ __('Map') }}" />
-                                            <flux:radio value="3" label="{{ __('Both') }}" />
-                                        </flux:radio.group>
+                                                <flux:radio.group wire:model="editAiLevelPreset" label="{{ __('AI level preset') }}" variant="segmented" size="sm">
+                                                    <flux:radio value="0" label="{{ __('Low') }}" />
+                                                    <flux:radio value="1" label="{{ __('Normal') }}" />
+                                                    <flux:radio value="2" label="{{ __('High') }}" />
+                                                    <flux:radio value="3" label="{{ __('Custom') }}" />
+                                                </flux:radio.group>
+
+                                                <div class="grid grid-cols-2 gap-3">
+                                                    <flux:input wire:model="editSkillAi" :label="__('AI Skill')" type="number" min="0" max="1" step="0.05" />
+                                                    <flux:input wire:model="editPrecisionAi" :label="__('AI Precision')" type="number" min="0" max="1" step="0.05" />
+                                                </div>
+                                            </div>
+
+                                            {{-- Column 3: HUD & view settings --}}
+                                            <div class="space-y-4">
+                                                <flux:radio.group wire:model="editCommands" label="{{ __('Commands') }}" variant="segmented" size="sm">
+                                                    <flux:radio value="0" label="{{ __('Never') }}" />
+                                                    <flux:radio value="1" label="{{ __('Fade') }}" />
+                                                    <flux:radio value="2" label="{{ __('Always') }}" />
+                                                </flux:radio.group>
+
+                                                <flux:radio.group wire:model="editWaypoints" label="{{ __('Waypoints') }}" variant="segmented" size="sm">
+                                                    <flux:radio value="0" label="{{ __('Never') }}" />
+                                                    <flux:radio value="1" label="{{ __('Fade') }}" />
+                                                    <flux:radio value="2" label="{{ __('Always') }}" />
+                                                </flux:radio.group>
+
+                                                <flux:radio.group wire:model="editWeaponInfo" label="{{ __('Weapon info') }}" variant="segmented" size="sm">
+                                                    <flux:radio value="0" label="{{ __('Never') }}" />
+                                                    <flux:radio value="1" label="{{ __('Fade') }}" />
+                                                    <flux:radio value="2" label="{{ __('Always') }}" />
+                                                </flux:radio.group>
+
+                                                <flux:radio.group wire:model="editStanceIndicator" label="{{ __('Stance indicator') }}" variant="segmented" size="sm">
+                                                    <flux:radio value="0" label="{{ __('Never') }}" />
+                                                    <flux:radio value="1" label="{{ __('Fade') }}" />
+                                                    <flux:radio value="2" label="{{ __('Always') }}" />
+                                                </flux:radio.group>
+
+                                                <flux:radio.group wire:model="editThirdPersonView" label="{{ __('Third person view') }}" variant="segmented" size="sm">
+                                                    <flux:radio value="0" label="{{ __('Disabled') }}" />
+                                                    <flux:radio value="1" label="{{ __('Enabled') }}" />
+                                                    <flux:radio value="2" label="{{ __('Vehicles') }}" />
+                                                </flux:radio.group>
+
+                                                <flux:radio.group wire:model="editTacticalPing" label="{{ __('Tactical ping') }}" variant="segmented" size="sm">
+                                                    <flux:radio value="0" label="{{ __('Off') }}" />
+                                                    <flux:radio value="1" label="{{ __('3D') }}" />
+                                                    <flux:radio value="2" label="{{ __('Map') }}" />
+                                                    <flux:radio value="3" label="{{ __('Both') }}" />
+                                                </flux:radio.group>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 
-                                <flux:separator />
+                                {{-- Network Settings (collapsed by default) --}}
+                                <div x-data="{ open: false }" class="rounded-lg border border-zinc-200 dark:border-zinc-700">
+                                    <button type="button" x-on:click="open = !open" class="flex w-full items-center gap-3 px-4 py-3 text-left">
+                                        <div class="flex-1">
+                                            <span class="text-base font-semibold text-zinc-800 dark:text-white">{{ __('Network Settings') }}</span>
+                                            <span class="block text-xs text-zinc-500 dark:text-zinc-400">{{ __('Bandwidth, packet sizes, terrain detail, and view distance tuning for server_basic.cfg.') }}</span>
+                                        </div>
+                                        <flux:icon.chevron-down class="size-4 text-zinc-400 transition-transform duration-200" ::class="open && 'rotate-180'" />
+                                    </button>
+                                    <div x-show="open" x-transition.opacity.duration.200ms class="space-y-4 border-t border-zinc-200 px-4 py-4 dark:border-zinc-700">
+                                        <div class="flex items-center gap-2">
+                                            <flux:button size="sm" variant="ghost" wire:click="applyNetworkPreset('default')" :loading="false" icon="arrow-path">
+                                                {{ __('Reset to Default') }}
+                                            </flux:button>
+                                            <flux:button size="sm" variant="primary" wire:click="applyNetworkPreset('high_performance')" :loading="false" icon="bolt">
+                                                {{ __('Apply High Performance') }}
+                                            </flux:button>
+                                        </div>
 
-                                <flux:heading size="lg">{{ __('Advanced') }}</flux:heading>
+                                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            <flux:field>
+                                                <flux:label>{{ __('MaxMsgSend') }}</flux:label>
+                                                <flux:input wire:model="editMaxMsgSend" type="number" min="1" max="10000" />
+                                                <flux:description>{{ __('Max packets per simulation cycle. Increasing this decreases lag on high-bandwidth servers. Default: 128, high-perf: 2048.') }}</flux:description>
+                                                <flux:error name="editMaxMsgSend" />
+                                            </flux:field>
 
-                                <flux:textarea wire:model="editAdditionalParams" :label="__('Additional Launch Parameters')" rows="2" :placeholder="__('-loadMissionToMemory -enableHT')" />
+                                            <flux:field>
+                                                <flux:label>{{ __('MaxSizeGuaranteed') }}</flux:label>
+                                                <flux:input wire:model="editMaxSizeGuaranteed" type="number" min="1" max="4096" />
+                                                <flux:description>{{ __('Max guaranteed packet payload in bytes (without headers). Used for non-repetitive events like shooting. Default: 512.') }}</flux:description>
+                                                <flux:error name="editMaxSizeGuaranteed" />
+                                            </flux:field>
 
-                                <flux:textarea wire:model="editAdditionalServerOptions" :label="__('Additional server.cfg Options')" rows="3" :placeholder="__('Raw config directives appended to server.cfg')" />
+                                            <flux:field>
+                                                <flux:label>{{ __('MaxSizeNonguaranteed') }}</flux:label>
+                                                <flux:input wire:model="editMaxSizeNonguaranteed" type="number" min="1" max="4096" />
+                                                <flux:description>{{ __('Max non-guaranteed packet payload in bytes. Used for repetitive updates like position. Increasing may improve bandwidth but can increase lag. Default: 256.') }}</flux:description>
+                                                <flux:error name="editMaxSizeNonguaranteed" />
+                                            </flux:field>
+                                        </div>
+
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <flux:field>
+                                                <flux:label>{{ __('MinBandwidth') }}</flux:label>
+                                                <flux:input wire:model="editMinBandwidth" type="number" min="0" />
+                                                <flux:description>{{ __('Bandwidth the server is guaranteed to have (bps). Too optimistic values increase lag and CPU load. Default: 131072, high-perf: 5120000.') }}</flux:description>
+                                                <flux:error name="editMinBandwidth" />
+                                            </flux:field>
+
+                                            <flux:field>
+                                                <flux:label>{{ __('MaxBandwidth') }}</flux:label>
+                                                <flux:input wire:model="editMaxBandwidth" type="number" min="0" />
+                                                <flux:description>{{ __('Bandwidth the server is guaranteed to never exceed (bps). Helps estimate available bandwidth. High-perf: 104857600 (100 Mbps).') }}</flux:description>
+                                                <flux:error name="editMaxBandwidth" />
+                                            </flux:field>
+                                        </div>
+
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <flux:field>
+                                                <flux:label>{{ __('MinErrorToSend') }}</flux:label>
+                                                <flux:input wire:model="editMinErrorToSend" type="text" inputmode="decimal" />
+                                                <flux:description>{{ __('Min error to send updates for distant units. Smaller values make units observed through optics move smoother, at the cost of more network traffic. Default: 0.001.') }}</flux:description>
+                                                <flux:error name="editMinErrorToSend" />
+                                            </flux:field>
+
+                                            <flux:field>
+                                                <flux:label>{{ __('MinErrorToSendNear') }}</flux:label>
+                                                <flux:input wire:model="editMinErrorToSendNear" type="text" inputmode="decimal" />
+                                                <flux:description>{{ __('Min error to send updates for near units. Larger values reduce traffic. Too large causes units to appear to warp. Default: 0.01.') }}</flux:description>
+                                                <flux:error name="editMinErrorToSendNear" />
+                                            </flux:field>
+                                        </div>
+
+                                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            <flux:field>
+                                                <flux:label>{{ __('MaxPacketSize') }}</flux:label>
+                                                <flux:input wire:model="editMaxPacketSize" type="number" min="256" max="1500" />
+                                                <flux:description>{{ __('Max packet size sent over network. Only change if your router/ISP enforces lower packet sizes and you have connectivity issues. Default: 1400.') }}</flux:description>
+                                                <flux:error name="editMaxPacketSize" />
+                                            </flux:field>
+
+                                            <flux:field>
+                                                <flux:label>{{ __('MaxCustomFileSize') }}</flux:label>
+                                                <flux:input wire:model="editMaxCustomFileSize" type="number" min="0" />
+                                                <flux:description>{{ __('Users with custom face/sound larger than this (bytes) are kicked on connect. 0 = no limit.') }}</flux:description>
+                                                <flux:error name="editMaxCustomFileSize" />
+                                            </flux:field>
+
+                                            <flux:field>
+                                                <flux:label>{{ __('View Distance') }}</flux:label>
+                                                <flux:input wire:model="editViewDistance" type="number" min="0" />
+                                                <flux:description>{{ __('Server-side view distance override in meters. 0 = use mission default.') }}</flux:description>
+                                                <flux:error name="editViewDistance" />
+                                            </flux:field>
+                                        </div>
+
+                                        <flux:field>
+                                            <flux:label>{{ __('Terrain Grid') }}</flux:label>
+                                            <flux:input wire:model="editTerrainGrid" type="text" inputmode="decimal" />
+                                            <flux:description>{{ __('Server-side terrain resolution. 25 = low detail, 3.125 = high detail. Lower values use more CPU but improve AI pathing. Default: 25, high-perf: 3.125.') }}</flux:description>
+                                            <flux:error name="editTerrainGrid" />
+                                        </flux:field>
+                                    </div>
+                                </div>
+
+                                {{-- Advanced (collapsed by default) --}}
+                                <div x-data="{ open: false }" class="rounded-lg border border-zinc-200 dark:border-zinc-700">
+                                    <button type="button" x-on:click="open = !open" class="flex w-full items-center gap-3 px-4 py-3 text-left">
+                                        <div class="flex-1">
+                                            <span class="text-base font-semibold text-zinc-800 dark:text-white">{{ __('Advanced') }}</span>
+                                            <span class="block text-xs text-zinc-500 dark:text-zinc-400">{{ __('Additional launch parameters and raw server.cfg directives.') }}</span>
+                                        </div>
+                                        <flux:icon.chevron-down class="size-4 text-zinc-400 transition-transform duration-200" ::class="open && 'rotate-180'" />
+                                    </button>
+                                    <div x-show="open" x-transition.opacity.duration.200ms class="space-y-4 border-t border-zinc-200 px-4 py-4 dark:border-zinc-700">
+                                        <flux:textarea wire:model="editAdditionalParams" :label="__('Additional Launch Parameters')" rows="2" :placeholder="__('-loadMissionToMemory -enableHT')" />
+                                        <flux:textarea wire:model="editAdditionalServerOptions" :label="__('Additional server.cfg Options')" rows="3" :placeholder="__('Raw config directives appended to server.cfg')" />
+                                    </div>
+                                </div>
+
+                                {{-- State Backups (collapsed by default) --}}
+                                <div x-data="{ open: false }" class="rounded-lg border border-zinc-200 dark:border-zinc-700">
+                                    <button type="button" x-on:click="open = !open" class="flex w-full items-center gap-3 px-4 py-3 text-left">
+                                        <div class="flex-1">
+                                            <span class="text-base font-semibold text-zinc-800 dark:text-white">{{ __('State Backups') }}</span>
+                                            <span class="block text-xs text-zinc-500 dark:text-zinc-400">{{ __('Back up and restore the .vars.Arma3Profile file for this server.') }}</span>
+                                        </div>
+                                        <flux:icon.chevron-down class="size-4 text-zinc-400 transition-transform duration-200" ::class="open && 'rotate-180'" />
+                                    </button>
+                                    <div x-show="open" x-transition.opacity.duration.200ms class="border-t border-zinc-200 px-4 py-4 dark:border-zinc-700">
+                                        @if (session('backup-status-'.$server->id))
+                                            <flux:callout variant="success" class="mb-4">
+                                                {{ session('backup-status-'.$server->id) }}
+                                            </flux:callout>
+                                        @endif
+
+                                        @if (session('backup-error-'.$server->id))
+                                            <flux:callout variant="danger" class="mb-4">
+                                                {{ session('backup-error-'.$server->id) }}
+                                            </flux:callout>
+                                        @endif
+
+                                        {{-- Create backup from current state --}}
+                                        <div class="flex items-end gap-3 mb-4">
+                                            <div class="flex-1 max-w-xs">
+                                                <flux:input wire:model="backupName" :label="__('Backup Name')" :placeholder="__('Optional label')" size="sm" />
+                                            </div>
+                                            <flux:button size="sm" wire:click="createBackup({{ $server->id }})" icon="arrow-down-on-square" :disabled="$status !== 'stopped'">
+                                                {{ __('Backup Current State') }}
+                                            </flux:button>
+                                        </div>
+
+                                        {{-- Upload a .vars file --}}
+                                        <div class="flex items-end gap-3 mb-6"
+                                            x-data="{ uploading: false, progress: 0 }"
+                                            x-on:livewire-upload-start="uploading = true; progress = 0"
+                                            x-on:livewire-upload-finish="uploading = false"
+                                            x-on:livewire-upload-cancel="uploading = false"
+                                            x-on:livewire-upload-error="uploading = false"
+                                            x-on:livewire-upload-progress="progress = $event.detail.progress"
+                                        >
+                                            <div class="flex-1 max-w-xs">
+                                                <flux:input wire:model="backupUploadName" :label="__('Upload Name')" :placeholder="__('Optional label')" size="sm" />
+                                            </div>
+                                            <div class="flex-1 max-w-xs">
+                                                <flux:field>
+                                                    <flux:label>{{ __('.vars File') }}</flux:label>
+                                                    <input type="file" wire:model="backupUploadFile"
+                                                        class="block w-full text-sm text-zinc-500 dark:text-zinc-400
+                                                            file:mr-4 file:py-1.5 file:px-3
+                                                            file:rounded-lg file:border-0
+                                                            file:text-sm file:font-semibold
+                                                            file:bg-zinc-100 file:text-zinc-700
+                                                            dark:file:bg-zinc-700 dark:file:text-zinc-200
+                                                            hover:file:bg-zinc-200 dark:hover:file:bg-zinc-600
+                                                            file:cursor-pointer cursor-pointer"
+                                                    />
+                                                    <flux:error name="backupUploadFile" />
+                                                </flux:field>
+                                            </div>
+                                            <flux:button size="sm" wire:click="uploadBackup({{ $server->id }})" icon="arrow-up-tray" x-bind:disabled="uploading" :disabled="!$backupUploadFile">
+                                                {{ __('Upload') }}
+                                            </flux:button>
+                                            <template x-if="uploading">
+                                                <div class="text-xs text-zinc-500" x-text="progress + '%'"></div>
+                                            </template>
+                                        </div>
+
+                                        {{-- Backup list --}}
+                                        @php $backups = $this->getBackups($server); @endphp
+                                        @if ($backups->isEmpty())
+                                            <flux:text class="text-sm text-zinc-500">{{ __('No backups yet.') }}</flux:text>
+                                        @else
+                                            <div class="overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-700">
+                                                <table class="min-w-full divide-y divide-zinc-200 dark:divide-zinc-700">
+                                                    <thead class="bg-zinc-50 dark:bg-zinc-800">
+                                                        <tr>
+                                                            <th class="px-3 py-2 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase">{{ __('Name') }}</th>
+                                                            <th class="px-3 py-2 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase">{{ __('Date') }}</th>
+                                                            <th class="px-3 py-2 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase">{{ __('Size') }}</th>
+                                                            <th class="px-3 py-2 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase">{{ __('Type') }}</th>
+                                                            <th class="px-3 py-2 text-right text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase">{{ __('Actions') }}</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
+                                                        @foreach ($backups as $backup)
+                                                            <tr wire:key="backup-{{ $backup->id }}">
+                                                                <td class="px-3 py-2 text-sm">
+                                                                    {{ $backup->name ?? __('Unnamed') }}
+                                                                </td>
+                                                                <td class="px-3 py-2 text-sm text-zinc-500">
+                                                                    {{ $backup->created_at->format('M j, Y g:i A') }}
+                                                                </td>
+                                                                <td class="px-3 py-2 text-sm text-zinc-500 font-mono">
+                                                                    {{ Number::fileSize($backup->file_size) }}
+                                                                </td>
+                                                                <td class="px-3 py-2 text-sm">
+                                                                    <flux:badge size="sm" :variant="$backup->is_automatic ? 'secondary' : 'primary'">
+                                                                        {{ $backup->is_automatic ? __('Auto') : __('Manual') }}
+                                                                    </flux:badge>
+                                                                </td>
+                                                                <td class="px-3 py-2 text-right">
+                                                                    <div class="flex items-center justify-end gap-1">
+                                                                        <flux:button size="xs" variant="ghost" :href="route('servers.backups.download', $backup)" icon="arrow-down-tray">
+                                                                        </flux:button>
+                                                                        <flux:button size="xs" variant="ghost" wire:click="confirmRestore({{ $backup->id }})" icon="arrow-uturn-left" :disabled="$status !== 'stopped'">
+                                                                        </flux:button>
+                                                                        <flux:button size="xs" variant="ghost" wire:click="deleteBackup({{ $backup->id }})" icon="trash">
+                                                                        </flux:button>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        @endforeach
+                                                    </tbody>
+                                                </table>
+                                            </div>
+
+                                            <flux:text class="mt-2 text-xs text-zinc-400">
+                                                {{ __('Retention limit: :count backups per server.', ['count' => config('arma.max_backups_per_server') ?: __('Unlimited')]) }}
+                                            </flux:text>
+                                        @endif
+                                    </div>
+                                </div>
 
                                 <div class="flex items-center gap-2">
                                     <flux:button variant="primary" type="submit" icon="check">{{ __('Save') }}</flux:button>
                                     <flux:button wire:click="cancelEditing">{{ __('Cancel') }}</flux:button>
                                 </div>
                             </form>
-
-                            {{-- Backups section (outside config form) --}}
-                            <div class="mt-6 pt-6 border-t border-zinc-200 dark:border-zinc-700">
-                                <flux:heading size="lg" class="mb-4">{{ __('State Backups') }}</flux:heading>
-                                <flux:text class="mb-4">{{ __('Back up and restore the .vars.Arma3Profile file, which stores this server\'s runtime state.') }}</flux:text>
-
-                                @if (session('backup-status-'.$server->id))
-                                    <flux:callout variant="success" class="mb-4">
-                                        {{ session('backup-status-'.$server->id) }}
-                                    </flux:callout>
-                                @endif
-
-                                @if (session('backup-error-'.$server->id))
-                                    <flux:callout variant="danger" class="mb-4">
-                                        {{ session('backup-error-'.$server->id) }}
-                                    </flux:callout>
-                                @endif
-
-                                {{-- Create backup from current state --}}
-                                <div class="flex items-end gap-3 mb-4">
-                                    <div class="flex-1 max-w-xs">
-                                        <flux:input wire:model="backupName" :label="__('Backup Name')" :placeholder="__('Optional label')" size="sm" />
-                                    </div>
-                                    <flux:button size="sm" wire:click="createBackup({{ $server->id }})" icon="arrow-down-on-square" :disabled="$status !== 'stopped'">
-                                        {{ __('Backup Current State') }}
-                                    </flux:button>
-                                </div>
-
-                                {{-- Upload a .vars file --}}
-                                <div class="flex items-end gap-3 mb-6"
-                                    x-data="{ uploading: false, progress: 0 }"
-                                    x-on:livewire-upload-start="uploading = true; progress = 0"
-                                    x-on:livewire-upload-finish="uploading = false"
-                                    x-on:livewire-upload-cancel="uploading = false"
-                                    x-on:livewire-upload-error="uploading = false"
-                                    x-on:livewire-upload-progress="progress = $event.detail.progress"
-                                >
-                                    <div class="flex-1 max-w-xs">
-                                        <flux:input wire:model="backupUploadName" :label="__('Upload Name')" :placeholder="__('Optional label')" size="sm" />
-                                    </div>
-                                    <div class="flex-1 max-w-xs">
-                                        <flux:field>
-                                            <flux:label>{{ __('.vars File') }}</flux:label>
-                                            <input type="file" wire:model="backupUploadFile"
-                                                class="block w-full text-sm text-zinc-500 dark:text-zinc-400
-                                                    file:mr-4 file:py-1.5 file:px-3
-                                                    file:rounded-lg file:border-0
-                                                    file:text-sm file:font-semibold
-                                                    file:bg-zinc-100 file:text-zinc-700
-                                                    dark:file:bg-zinc-700 dark:file:text-zinc-200
-                                                    hover:file:bg-zinc-200 dark:hover:file:bg-zinc-600
-                                                    file:cursor-pointer cursor-pointer"
-                                            />
-                                            <flux:error name="backupUploadFile" />
-                                        </flux:field>
-                                    </div>
-                                    <flux:button size="sm" wire:click="uploadBackup({{ $server->id }})" icon="arrow-up-tray" x-bind:disabled="uploading" :disabled="!$backupUploadFile">
-                                        {{ __('Upload') }}
-                                    </flux:button>
-                                    <template x-if="uploading">
-                                        <div class="text-xs text-zinc-500" x-text="progress + '%'"></div>
-                                    </template>
-                                </div>
-
-                                {{-- Backup list --}}
-                                @php $backups = $this->getBackups($server); @endphp
-                                @if ($backups->isEmpty())
-                                    <flux:text class="text-sm text-zinc-500">{{ __('No backups yet.') }}</flux:text>
-                                @else
-                                    <div class="overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-700">
-                                        <table class="min-w-full divide-y divide-zinc-200 dark:divide-zinc-700">
-                                            <thead class="bg-zinc-50 dark:bg-zinc-800">
-                                                <tr>
-                                                    <th class="px-3 py-2 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase">{{ __('Name') }}</th>
-                                                    <th class="px-3 py-2 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase">{{ __('Date') }}</th>
-                                                    <th class="px-3 py-2 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase">{{ __('Size') }}</th>
-                                                    <th class="px-3 py-2 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase">{{ __('Type') }}</th>
-                                                    <th class="px-3 py-2 text-right text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase">{{ __('Actions') }}</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
-                                                @foreach ($backups as $backup)
-                                                    <tr wire:key="backup-{{ $backup->id }}">
-                                                        <td class="px-3 py-2 text-sm">
-                                                            {{ $backup->name ?? __('Unnamed') }}
-                                                        </td>
-                                                        <td class="px-3 py-2 text-sm text-zinc-500">
-                                                            {{ $backup->created_at->format('M j, Y g:i A') }}
-                                                        </td>
-                                                        <td class="px-3 py-2 text-sm text-zinc-500 font-mono">
-                                                            {{ Number::fileSize($backup->file_size) }}
-                                                        </td>
-                                                        <td class="px-3 py-2 text-sm">
-                                                            <flux:badge size="sm" :variant="$backup->is_automatic ? 'secondary' : 'primary'">
-                                                                {{ $backup->is_automatic ? __('Auto') : __('Manual') }}
-                                                            </flux:badge>
-                                                        </td>
-                                                        <td class="px-3 py-2 text-right">
-                                                            <div class="flex items-center justify-end gap-1">
-                                                                <flux:button size="xs" variant="ghost" :href="route('servers.backups.download', $backup)" icon="arrow-down-tray">
-                                                                </flux:button>
-                                                                <flux:button size="xs" variant="ghost" wire:click="confirmRestore({{ $backup->id }})" icon="arrow-uturn-left" :disabled="$status !== 'stopped'">
-                                                                </flux:button>
-                                                                <flux:button size="xs" variant="ghost" wire:click="deleteBackup({{ $backup->id }})" icon="trash">
-                                                                </flux:button>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                @endforeach
-                                            </tbody>
-                                        </table>
-                                    </div>
-
-                                    <flux:text class="mt-2 text-xs text-zinc-400">
-                                        {{ __('Retention limit: :count backups per server.', ['count' => config('arma.max_backups_per_server') ?: __('Unlimited')]) }}
-                                    </flux:text>
-                                @endif
-                            </div>
                         </div>
                     @endif
                 </div>
@@ -1054,17 +1277,22 @@ new #[Title('Servers')] class extends Component
         <flux:text class="mt-1 mb-4">{{ __('Configure a new Arma 3 server instance.') }}</flux:text>
 
         <form wire:submit="createServer" class="space-y-4">
-            <flux:input wire:model="createName" :label="__('Server Name')" required />
-
             @include('pages.servers.partials.form-fields', ['prefix' => 'create'])
 
-            <flux:separator />
-
-            <flux:heading size="lg">{{ __('Advanced') }}</flux:heading>
-
-            <flux:textarea wire:model="createAdditionalParams" :label="__('Additional Launch Parameters')" rows="2" :placeholder="__('-loadMissionToMemory -enableHT')" />
-
-            <flux:textarea wire:model="createAdditionalServerOptions" :label="__('Additional server.cfg Options')" rows="3" :placeholder="__('Raw config directives appended to server.cfg')" />
+            {{-- Advanced (collapsed by default) --}}
+            <div x-data="{ open: false }" class="rounded-lg border border-zinc-200 dark:border-zinc-700">
+                <button type="button" x-on:click="open = !open" class="flex w-full items-center gap-3 px-4 py-3 text-left">
+                    <div class="flex-1">
+                        <span class="text-base font-semibold text-zinc-800 dark:text-white">{{ __('Advanced') }}</span>
+                        <span class="block text-xs text-zinc-500 dark:text-zinc-400">{{ __('Additional launch parameters and raw server.cfg directives.') }}</span>
+                    </div>
+                    <flux:icon.chevron-down class="size-4 text-zinc-400 transition-transform duration-200" ::class="open && 'rotate-180'" />
+                </button>
+                <div x-show="open" x-transition.opacity.duration.200ms class="space-y-4 border-t border-zinc-200 px-4 py-4 dark:border-zinc-700">
+                    <flux:textarea wire:model="createAdditionalParams" :label="__('Additional Launch Parameters')" rows="2" :placeholder="__('-loadMissionToMemory -enableHT')" />
+                    <flux:textarea wire:model="createAdditionalServerOptions" :label="__('Additional server.cfg Options')" rows="3" :placeholder="__('Raw config directives appended to server.cfg')" />
+                </div>
+            </div>
 
             <div class="flex justify-end gap-2 pt-2">
                 <flux:button wire:click="$set('showCreateModal', false)">{{ __('Cancel') }}</flux:button>

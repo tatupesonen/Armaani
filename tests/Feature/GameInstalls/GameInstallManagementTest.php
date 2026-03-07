@@ -7,6 +7,7 @@ use App\Jobs\InstallServerJob;
 use App\Models\GameInstall;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -17,11 +18,23 @@ class GameInstallManagementTest extends TestCase
 
     protected User $user;
 
+    private string $testGamesBasePath;
+
     protected function setUp(): void
     {
         parent::setUp();
 
+        $this->testGamesBasePath = sys_get_temp_dir().'/armaman_test_games_'.uniqid();
+        config(['arma.games_base_path' => $this->testGamesBasePath]);
+
         $this->user = User::factory()->create();
+    }
+
+    protected function tearDown(): void
+    {
+        File::deleteDirectory($this->testGamesBasePath);
+
+        parent::tearDown();
     }
 
     public function test_game_installs_page_requires_authentication(): void

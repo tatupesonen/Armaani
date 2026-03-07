@@ -9,6 +9,7 @@ use App\Models\Server;
 use App\Models\User;
 use App\Services\ServerProcessService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\File;
 use Livewire\Livewire;
 use Mockery;
 use Tests\Concerns\MocksServerProcessService;
@@ -23,12 +24,24 @@ class ServerManagementTest extends TestCase
 
     protected GameInstall $gameInstall;
 
+    private string $testServersBasePath;
+
     protected function setUp(): void
     {
         parent::setUp();
 
+        $this->testServersBasePath = sys_get_temp_dir().'/armaman_test_servers_'.uniqid();
+        config(['arma.servers_base_path' => $this->testServersBasePath]);
+
         $this->user = User::factory()->create();
         $this->gameInstall = GameInstall::factory()->installed()->create();
+    }
+
+    protected function tearDown(): void
+    {
+        File::deleteDirectory($this->testServersBasePath);
+
+        parent::tearDown();
     }
 
     public function test_servers_index_page_requires_authentication(): void
@@ -387,10 +400,6 @@ class ServerManagementTest extends TestCase
         Livewire::test('pages::servers.index')
             ->call('loadServerLog', $server->id)
             ->assertReturned(['Line 1', 'Line 2', 'Line 3']);
-
-        // Clean up
-        @unlink($logPath);
-        @rmdir(dirname($logPath));
     }
 
     public function test_load_server_log_returns_empty_when_no_log_file(): void
@@ -520,5 +529,127 @@ class ServerManagementTest extends TestCase
 
         Livewire::test('pages::servers.index')
             ->call('removeHeadlessClient', $server->id);
+    }
+
+    public function test_create_server_creates_network_settings_with_defaults(): void
+    {
+        $this->actingAs($this->user);
+
+        Livewire::test('pages::servers.index')
+            ->call('openCreateModal')
+            ->set('createName', 'Network Test Server')
+            ->set('createPort', 2350)
+            ->set('createQueryPort', 2351)
+            ->set('createMaxPlayers', 32)
+            ->set('createGameInstallId', $this->gameInstall->id)
+            ->call('createServer')
+            ->assertHasNoErrors();
+
+        $server = Server::query()->where('name', 'Network Test Server')->first();
+        $this->assertNotNull($server->networkSettings);
+        $this->assertEquals(128, $server->networkSettings->max_msg_send);
+        $this->assertEquals(512, $server->networkSettings->max_size_guaranteed);
+        $this->assertEquals(1400, $server->networkSettings->max_packet_size);
+    }
+
+    public function test_edit_server_loads_network_settings(): void
+    {
+        $this->actingAs($this->user);
+
+        $server = Server::factory()->create();
+        $server->networkSettings()->create([
+            'max_msg_send' => 2048,
+            'min_bandwidth' => 5120000,
+            'terrain_grid' => 3.125,
+        ]);
+
+        $this->mockServerProcessService();
+
+        Livewire::test('pages::servers.index')
+            ->call('startEditing', $server->id)
+            ->assertSet('editMaxMsgSend', 2048)
+            ->assertSet('editMinBandwidth', '5120000')
+            ->assertSet('editTerrainGrid', '3.1250');
+    }
+
+    public function test_edit_server_saves_network_settings(): void
+    {
+        $this->actingAs($this->user);
+
+        $server = Server::factory()->create();
+        $server->networkSettings()->create([]);
+
+        $this->mockServerProcessService();
+
+        Livewire::test('pages::servers.index')
+            ->call('startEditing', $server->id)
+            ->set('editMaxMsgSend', 2048)
+            ->set('editMinBandwidth', '5120000')
+            ->set('editMaxBandwidth', '104857600')
+            ->set('editTerrainGrid', '3.1250')
+            ->set('editViewDistance', 5000)
+            ->call('saveServer')
+            ->assertHasNoErrors();
+
+        $server->refresh();
+        $this->assertEquals(2048, $server->networkSettings->max_msg_send);
+        $this->assertEquals(5120000, $server->networkSettings->min_bandwidth);
+        $this->assertEquals(104857600, $server->networkSettings->max_bandwidth);
+        $this->assertEquals(5000, $server->networkSettings->view_distance);
+    }
+
+    public function test_apply_high_performance_network_preset(): void
+    {
+        $this->actingAs($this->user);
+
+        $server = Server::factory()->create();
+        $server->networkSettings()->create([]);
+
+        $this->mockServerProcessService();
+
+        Livewire::test('pages::servers.index')
+            ->call('startEditing', $server->id)
+            ->call('applyNetworkPreset', 'high_performance')
+            ->assertSet('editMaxMsgSend', 2048)
+            ->assertSet('editMinBandwidth', '5120000')
+            ->assertSet('editMaxBandwidth', '104857600')
+            ->assertSet('editTerrainGrid', '3.1250');
+    }
+
+    public function test_apply_default_network_preset(): void
+    {
+        $this->actingAs($this->user);
+
+        $server = Server::factory()->create();
+        $server->networkSettings()->create([]);
+
+        $this->mockServerProcessService();
+
+        Livewire::test('pages::servers.index')
+            ->call('startEditing', $server->id)
+            ->call('applyNetworkPreset', 'high_performance')
+            ->assertSet('editMaxMsgSend', 2048)
+            ->call('applyNetworkPreset', 'default')
+            ->assertSet('editMaxMsgSend', 128)
+            ->assertSet('editMinBandwidth', '131072')
+            ->assertSet('editMaxBandwidth', '10000000000')
+            ->assertSet('editTerrainGrid', '25.0000');
+    }
+
+    public function test_network_settings_validation_rejects_invalid_values(): void
+    {
+        $this->actingAs($this->user);
+
+        $server = Server::factory()->create();
+        $server->networkSettings()->create([]);
+
+        $this->mockServerProcessService();
+
+        Livewire::test('pages::servers.index')
+            ->call('startEditing', $server->id)
+            ->set('editMaxMsgSend', 0)
+            ->set('editMaxPacketSize', 100)
+            ->call('saveServer')
+            ->assertHasErrors(['editMaxMsgSend', 'editMaxPacketSize']);
     }
 }

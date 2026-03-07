@@ -29,6 +29,16 @@ class WorkshopModFactory extends Factory
         return $this->state(fn (): array => [
             'installation_status' => InstallationStatus::Installed,
             'installed_at' => now(),
+            'steam_updated_at' => now()->subDay(),
+        ]);
+    }
+
+    public function outdated(): static
+    {
+        return $this->state(fn (): array => [
+            'installation_status' => InstallationStatus::Installed,
+            'installed_at' => now()->subDays(3),
+            'steam_updated_at' => now(),
         ]);
     }
 

@@ -23,12 +23,35 @@ class DownloadModJobTest extends TestCase
     use MocksSteamCmdProcess;
     use RefreshDatabase;
 
+    private string $testModsBasePath;
+
     protected function setUp(): void
     {
         parent::setUp();
 
+        $this->testModsBasePath = sys_get_temp_dir().'/armaman_test_mods_'.uniqid();
+        config(['arma.mods_base_path' => $this->testModsBasePath]);
+
         SteamAccount::factory()->create();
         Event::fake([ModDownloadOutput::class]);
+    }
+
+    protected function tearDown(): void
+    {
+        File::deleteDirectory($this->testModsBasePath);
+
+        parent::tearDown();
+    }
+
+    /**
+     * Create a SteamWorkshopService mock that allows getModDetails calls.
+     */
+    private function mockWorkshopService(?array $returnValue = null): \Mockery\MockInterface
+    {
+        $mock = Mockery::mock(SteamWorkshopService::class);
+        $mock->shouldReceive('getModDetails')->andReturn($returnValue);
+
+        return $mock;
     }
 
     public function test_successful_download_marks_mod_as_installed(): void
@@ -44,7 +67,7 @@ class DownloadModJobTest extends TestCase
         $steamCmd = Mockery::mock(SteamCmdService::class);
         $steamCmd->shouldReceive('startDownloadMod')->once()->andReturn($this->makeInvokedProcess(true));
 
-        $workshop = Mockery::mock(SteamWorkshopService::class);
+        $workshop = $this->mockWorkshopService();
 
         $this->app->instance(SteamCmdService::class, $steamCmd);
         $this->app->instance(SteamWorkshopService::class, $workshop);
@@ -71,7 +94,7 @@ class DownloadModJobTest extends TestCase
         $steamCmd = Mockery::mock(SteamCmdService::class);
         $steamCmd->shouldReceive('startDownloadMod')->once()->andReturn($this->makeInvokedProcess(false));
 
-        $workshop = Mockery::mock(SteamWorkshopService::class);
+        $workshop = $this->mockWorkshopService();
 
         $this->app->instance(SteamCmdService::class, $steamCmd);
         $this->app->instance(SteamWorkshopService::class, $workshop);
@@ -101,6 +124,7 @@ class DownloadModJobTest extends TestCase
         $workshop->shouldReceive('getModDetails')->once()->andReturn([
             'name' => 'Fetched Mod Name',
             'file_size' => 75000000,
+            'time_updated' => 1700000000,
         ]);
 
         $this->app->instance(SteamCmdService::class, $steamCmd);
@@ -115,7 +139,38 @@ class DownloadModJobTest extends TestCase
         $this->assertEquals(InstallationStatus::Installed, $mod->installation_status);
     }
 
-    public function test_job_skips_metadata_fetch_when_already_set(): void
+    public function test_job_saves_steam_updated_at_from_metadata(): void
+    {
+        $mod = WorkshopMod::factory()->create([
+            'name' => null,
+            'file_size' => null,
+            'installation_status' => InstallationStatus::Queued,
+        ]);
+
+        Process::fake(['du *' => Process::result('50000000	/fake/path')]);
+
+        $steamCmd = Mockery::mock(SteamCmdService::class);
+        $steamCmd->shouldReceive('startDownloadMod')->once()->andReturn($this->makeInvokedProcess(true));
+
+        $workshop = Mockery::mock(SteamWorkshopService::class);
+        $workshop->shouldReceive('getModDetails')->once()->andReturn([
+            'name' => 'Test Mod',
+            'file_size' => 50000000,
+            'time_updated' => 1700000000,
+        ]);
+
+        $this->app->instance(SteamCmdService::class, $steamCmd);
+        $this->app->instance(SteamWorkshopService::class, $workshop);
+
+        $job = new DownloadModJob($mod);
+        $job->handle($steamCmd, $workshop);
+
+        $mod->refresh();
+        $this->assertNotNull($mod->steam_updated_at);
+        $this->assertEquals(1700000000, $mod->steam_updated_at->timestamp);
+    }
+
+    public function test_job_always_fetches_metadata_to_update_steam_updated_at(): void
     {
         $mod = WorkshopMod::factory()->create([
             'name' => 'Already Named',
@@ -129,7 +184,11 @@ class DownloadModJobTest extends TestCase
         $steamCmd->shouldReceive('startDownloadMod')->once()->andReturn($this->makeInvokedProcess(true));
 
         $workshop = Mockery::mock(SteamWorkshopService::class);
-        $workshop->shouldNotReceive('getModDetails');
+        $workshop->shouldReceive('getModDetails')->once()->andReturn([
+            'name' => 'Already Named',
+            'file_size' => 30000000,
+            'time_updated' => 1700000000,
+        ]);
 
         $this->app->instance(SteamCmdService::class, $steamCmd);
         $this->app->instance(SteamWorkshopService::class, $workshop);
@@ -139,6 +198,7 @@ class DownloadModJobTest extends TestCase
 
         $mod->refresh();
         $this->assertEquals('Already Named', $mod->name);
+        $this->assertNotNull($mod->steam_updated_at);
     }
 
     public function test_failed_handler_marks_mod_as_failed(): void
@@ -175,7 +235,7 @@ class DownloadModJobTest extends TestCase
             }
         );
 
-        $workshop = Mockery::mock(SteamWorkshopService::class);
+        $workshop = $this->mockWorkshopService();
 
         $this->app->instance(SteamCmdService::class, $steamCmd);
         $this->app->instance(SteamWorkshopService::class, $workshop);
@@ -199,7 +259,7 @@ class DownloadModJobTest extends TestCase
         $steamCmd = Mockery::mock(SteamCmdService::class);
         $steamCmd->shouldReceive('startDownloadMod')->once()->andReturn($this->makeInvokedProcess(true));
 
-        $workshop = Mockery::mock(SteamWorkshopService::class);
+        $workshop = $this->mockWorkshopService();
 
         $this->app->instance(SteamCmdService::class, $steamCmd);
         $this->app->instance(SteamWorkshopService::class, $workshop);
@@ -236,7 +296,7 @@ class DownloadModJobTest extends TestCase
         $steamCmd = Mockery::mock(SteamCmdService::class);
         $steamCmd->shouldReceive('startDownloadMod')->once()->andReturn($this->makeInvokedProcess(true));
 
-        $workshop = Mockery::mock(SteamWorkshopService::class);
+        $workshop = $this->mockWorkshopService();
 
         $this->app->instance(SteamCmdService::class, $steamCmd);
         $this->app->instance(SteamWorkshopService::class, $workshop);
@@ -249,8 +309,5 @@ class DownloadModJobTest extends TestCase
         $this->assertFileExists($modPath.'/mod.cpp');
         $this->assertFileDoesNotExist($modPath.'/Addons/MyAddon.pbo');
         $this->assertFileDoesNotExist($modPath.'/Mod.cpp');
-
-        // Cleanup
-        File::deleteDirectory($modPath);
     }
 }

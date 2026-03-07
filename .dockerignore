@@ -1,10 +1,10 @@
 .git
 .github
 .env
-.env.example
 node_modules
 vendor
 tests
+storage/arma
 storage/logs/*
 storage/framework/cache/*
 storage/framework/sessions/*

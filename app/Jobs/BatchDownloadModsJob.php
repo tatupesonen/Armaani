@@ -120,28 +120,31 @@ class BatchDownloadModsJob implements ShouldQueue
     }
 
     /**
-     * Fetch name and expected file size from Steam API for all mods missing metadata.
-     * Uses a single bulk API call instead of one request per mod.
+     * Fetch name, expected file size, and last-updated timestamp from Steam API.
+     * Always fetches all mods to keep steam_updated_at current.
      */
     protected function fetchAllMetadata(SteamWorkshopService $workshop): void
     {
-        $modsNeedingMetadata = $this->mods->filter(fn (WorkshopMod $mod) => ! $mod->name || ! $mod->file_size);
-
-        if ($modsNeedingMetadata->isEmpty()) {
-            return;
-        }
-
-        $workshopIds = $modsNeedingMetadata->pluck('workshop_id')->all();
+        $workshopIds = $this->mods->pluck('workshop_id')->all();
         $detailsMap = $workshop->getMultipleModDetails($workshopIds);
 
-        foreach ($modsNeedingMetadata as $mod) {
+        foreach ($this->mods as $mod) {
             $details = $detailsMap[$mod->workshop_id] ?? null;
 
-            if ($details) {
-                $mod->update(array_filter([
-                    'name' => $mod->name ?? $details['name'],
-                    'file_size' => $mod->file_size ?? $details['file_size'],
-                ]));
+            if (! $details) {
+                continue;
+            }
+
+            $updates = array_filter([
+                'name' => $mod->name ?? $details['name'],
+                'file_size' => $mod->file_size ?? $details['file_size'],
+                'steam_updated_at' => isset($details['time_updated'])
+                    ? \Carbon\Carbon::createFromTimestamp($details['time_updated'])
+                    : null,
+            ]);
+
+            if (! empty($updates)) {
+                $mod->update($updates);
             }
         }
     }

@@ -5,6 +5,7 @@ namespace Tests\Feature\Missions;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\File;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -21,19 +22,13 @@ class MissionManagementTest extends TestCase
         parent::setUp();
 
         $this->user = User::factory()->create();
-        $this->missionsPath = storage_path('arma/missions_test_'.uniqid());
+        $this->missionsPath = sys_get_temp_dir().'/armaman_test_missions_'.uniqid();
         config(['arma.missions_base_path' => $this->missionsPath]);
     }
 
     protected function tearDown(): void
     {
-        if (is_dir($this->missionsPath)) {
-            $files = glob($this->missionsPath.'/*') ?: [];
-            foreach ($files as $file) {
-                unlink($file);
-            }
-            rmdir($this->missionsPath);
-        }
+        File::deleteDirectory($this->missionsPath);
 
         parent::tearDown();
     }

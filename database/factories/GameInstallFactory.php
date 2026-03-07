@@ -19,6 +19,8 @@ class GameInstallFactory extends Factory
             'name' => 'Arma 3 Server',
             'branch' => 'public',
             'installation_status' => InstallationStatus::Queued,
+            'progress_pct' => 0,
+            'disk_size_bytes' => 0,
             'installed_at' => null,
         ];
     }
@@ -28,6 +30,7 @@ class GameInstallFactory extends Factory
         return $this->state(fn (): array => [
             'installation_status' => InstallationStatus::Installed,
             'installed_at' => now(),
+            'build_id' => (string) fake()->numberBetween(10000000, 99999999),
         ]);
     }
 

@@ -4,6 +4,7 @@ namespace Tests\Feature\Servers;
 
 use App\Models\GameInstall;
 use App\Models\ModPreset;
+use App\Models\NetworkSettings;
 use App\Models\Server;
 use App\Models\WorkshopMod;
 use App\Services\ServerProcessService;
@@ -24,6 +25,10 @@ class ServerProcessServiceTest extends TestCase
 
     private string $testModsBasePath;
 
+    private string $testStoragePath;
+
+    private string $originalStoragePath;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -31,6 +36,12 @@ class ServerProcessServiceTest extends TestCase
         $this->testServersBasePath = sys_get_temp_dir().'/armaman_test_servers_'.uniqid();
         $this->testGamesBasePath = sys_get_temp_dir().'/armaman_test_games_'.uniqid();
         $this->testModsBasePath = sys_get_temp_dir().'/armaman_test_mods_'.uniqid();
+        $this->testStoragePath = sys_get_temp_dir().'/armaman_test_storage_'.uniqid();
+
+        @mkdir($this->testStoragePath.'/app', 0755, true);
+
+        $this->originalStoragePath = app()->storagePath();
+        app()->useStoragePath($this->testStoragePath);
 
         config([
             'arma.servers_base_path' => $this->testServersBasePath,
@@ -179,6 +190,100 @@ class ServerProcessServiceTest extends TestCase
         $this->assertStringContainsString('MaxMsgSend = 128;', $contents);
     }
 
+    public function test_generate_basic_config_uses_custom_network_settings(): void
+    {
+        $server = $this->makeServer();
+
+        NetworkSettings::factory()->create([
+            'server_id' => $server->id,
+            'max_msg_send' => 2048,
+            'max_size_guaranteed' => 1024,
+            'max_size_nonguaranteed' => 512,
+            'min_bandwidth' => 5120000,
+            'max_bandwidth' => 104857600,
+            'min_error_to_send' => 0.0005,
+            'min_error_to_send_near' => 0.005,
+            'max_packet_size' => 1300,
+            'max_custom_file_size' => 2048,
+            'terrain_grid' => 3.125,
+            'view_distance' => 5000,
+        ]);
+        $server->refresh();
+
+        $profilesPath = $server->getProfilesPath();
+        @mkdir($profilesPath, 0755, true);
+
+        $this->invokeGenerateBasicConfig($server);
+
+        $contents = file_get_contents($profilesPath.'/server_basic.cfg');
+        $this->assertStringContainsString('MaxMsgSend = 2048;', $contents);
+        $this->assertStringContainsString('MaxSizeGuaranteed = 1024;', $contents);
+        $this->assertStringContainsString('MaxSizeNonguaranteed = 512;', $contents);
+        $this->assertStringContainsString('MinBandwidth = 5120000;', $contents);
+        $this->assertStringContainsString('MaxBandwidth = 104857600;', $contents);
+        $this->assertStringContainsString('MinErrorToSend = 0.0005;', $contents);
+        $this->assertStringContainsString('MinErrorToSendNear = 0.005;', $contents);
+        $this->assertStringContainsString('maxPacketSize = 1300;', $contents);
+        $this->assertStringContainsString('MaxCustomFileSize = 2048;', $contents);
+        $this->assertStringContainsString('terrainGrid = 3.125;', $contents);
+        $this->assertStringContainsString('viewDistance = 5000;', $contents);
+    }
+
+    public function test_generate_basic_config_uses_defaults_when_no_network_settings(): void
+    {
+        $server = $this->makeServer();
+
+        $profilesPath = $server->getProfilesPath();
+        @mkdir($profilesPath, 0755, true);
+
+        $this->invokeGenerateBasicConfig($server);
+
+        $contents = file_get_contents($profilesPath.'/server_basic.cfg');
+        $this->assertStringContainsString('MaxMsgSend = 128;', $contents);
+        $this->assertStringContainsString('MinBandwidth = 131072;', $contents);
+        $this->assertStringContainsString('maxPacketSize = 1400;', $contents);
+        $this->assertStringContainsString('terrainGrid = 25;', $contents);
+        $this->assertStringNotContainsString('viewDistance', $contents);
+    }
+
+    public function test_generate_basic_config_omits_view_distance_when_zero(): void
+    {
+        $server = $this->makeServer();
+
+        NetworkSettings::factory()->create([
+            'server_id' => $server->id,
+            'view_distance' => 0,
+        ]);
+        $server->refresh();
+
+        $profilesPath = $server->getProfilesPath();
+        @mkdir($profilesPath, 0755, true);
+
+        $this->invokeGenerateBasicConfig($server);
+
+        $contents = file_get_contents($profilesPath.'/server_basic.cfg');
+        $this->assertStringNotContainsString('viewDistance', $contents);
+    }
+
+    public function test_generate_basic_config_includes_view_distance_when_set(): void
+    {
+        $server = $this->makeServer();
+
+        NetworkSettings::factory()->create([
+            'server_id' => $server->id,
+            'view_distance' => 3000,
+        ]);
+        $server->refresh();
+
+        $profilesPath = $server->getProfilesPath();
+        @mkdir($profilesPath, 0755, true);
+
+        $this->invokeGenerateBasicConfig($server);
+
+        $contents = file_get_contents($profilesPath.'/server_basic.cfg');
+        $this->assertStringContainsString('viewDistance = 3000;', $contents);
+    }
+
     public function test_generate_server_config_no_missions_block_when_no_pbo_files(): void
     {
         $server = $this->makeServer(['description' => null]);
@@ -252,10 +357,13 @@ class ServerProcessServiceTest extends TestCase
         File::deleteDirectory($this->testServersBasePath);
         File::deleteDirectory($this->testGamesBasePath);
         File::deleteDirectory($this->testModsBasePath);
+        File::deleteDirectory($this->testStoragePath);
 
         if (isset($this->missionsPath)) {
             File::deleteDirectory($this->missionsPath);
         }
+
+        app()->useStoragePath($this->originalStoragePath);
 
         parent::tearDown();
     }
@@ -556,7 +664,7 @@ class ServerProcessServiceTest extends TestCase
 
     private function makeServer(array $attributes = []): Server
     {
-        $this->missionsPath = storage_path('arma/missions_test_'.uniqid());
+        $this->missionsPath = sys_get_temp_dir().'/armaman_test_missions_'.uniqid();
 
         $gameInstall = GameInstall::factory()->installed()->create();
 

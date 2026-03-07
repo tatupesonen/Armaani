@@ -19,6 +19,7 @@ class WorkshopMod extends Model
         'installation_status',
         'progress_pct',
         'installed_at',
+        'steam_updated_at',
     ];
 
     /**
@@ -32,6 +33,7 @@ class WorkshopMod extends Model
             'installation_status' => InstallationStatus::class,
             'progress_pct' => 'integer',
             'installed_at' => 'datetime',
+            'steam_updated_at' => 'datetime',
         ];
     }
 
@@ -50,6 +52,18 @@ class WorkshopMod extends Model
         $name = preg_replace('/[^A-Za-z0-9_]/', '', trim($name));
 
         return '@'.$name;
+    }
+
+    /**
+     * Determine if this mod has a newer version available on the Workshop.
+     */
+    public function isOutdated(): bool
+    {
+        if (! $this->steam_updated_at || ! $this->installed_at) {
+            return false;
+        }
+
+        return $this->steam_updated_at->gt($this->installed_at);
     }
 
     /**

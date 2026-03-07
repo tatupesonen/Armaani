@@ -280,14 +280,16 @@ protected function isAccessible(User $user, ?string $path = null): bool
 
 ## Project Overview
 
-ArmaMan is a web-based Arma 3 dedicated server manager built with Laravel 12, Livewire 4, and Flux UI. It allows users to install, configure, and manage multiple Arma 3 server instances (including starting/stopping/restarting processes), download Steam Workshop mods via SteamCMD, organize mods into presets, import Arma 3 Launcher HTML preset files, and assign presets to server instances. The application supports headless client management per server. It ships as a single Docker container with SteamCMD bundled inside.
+ArmaMan is a web-based Arma 3 dedicated server manager built with Laravel 12, Livewire 4, and Flux UI. It allows users to install, configure, and manage multiple Arma 3 server instances (including starting/stopping/restarting processes), download Steam Workshop mods via SteamCMD, organize mods into presets, import Arma 3 Launcher HTML preset files, and assign presets to server instances. The application supports dynamic headless client management per server, server difficulty settings, and `.vars.Arma3Profile` backup/restore. It ships as a single Docker container with SteamCMD bundled inside.
 
 ## Scope
 
 - **Arma 3 only** — no DayZ, DayZ Experimental, or Arma Reforger support.
-- Full server process control (start/stop/restart) from the web UI.
-- Headless client support (launch/stop HC instances per server).
+- Full server process control (start/stop/restart) from the web UI via queued jobs (`StartServerJob`, `StopServerJob`).
+- Dynamic headless client support (add/remove individual HC instances per server, max 10).
 - Arma 3 Launcher HTML preset import supported.
+- Server difficulty settings (per-server Arma 3 difficulty options).
+- `.vars.Arma3Profile` backup and restore (automatic on server start, manual upload/download).
 
 ## Domain Concepts
 
@@ -295,7 +297,7 @@ ArmaMan is a web-based Arma 3 dedicated server manager built with Laravel 12, Li
 - A `GameInstall` represents a downloaded copy of the Arma 3 dedicated server files (Steam App ID 233780).
 - Multiple installs can exist with different names and branches (public, contact, creatordlc, profiling, performance, legacy).
 - Branches are hardcoded — `GetAppBetas` Steam API requires a Steamworks partner token and returns 403 with a regular key.
-- Each install tracks: `name`, `branch`, `installation_status` (`GameInstallStatus` enum), `progress_pct` (0–100), `disk_size_bytes`, `installed_at`.
+- Each install tracks: `name`, `branch`, `installation_status` (`InstallationStatus` enum — same enum used for both game installs and mods), `progress_pct` (0–100), `disk_size_bytes`, `installed_at`.
 - Installed via `InstallServerJob`, which streams SteamCMD output line-by-line via a callback, parses progress lines, and writes `progress_pct` + `disk_size_bytes` to DB (throttled every 1 percentage point using `updateQuietly`).
 - SteamCMD progress line format: `Update state (0x61) downloading, progress: 44.53 (2397543803 / 5384428737)` — emitted roughly every 2 seconds.
 - On completion, actual disk size is recorded via `du -sb`.
@@ -305,30 +307,33 @@ ArmaMan is a web-based Arma 3 dedicated server manager built with Laravel 12, Li
 ### Server Instances
 - Each server **must** be linked to a `GameInstall` (`game_install_id` required — no server without one).
 - Configuration is managed inline on the servers index page (expand/collapse panel) — no separate create/edit pages.
-- Each server has: name, port, query_port, max_players, password, admin_password, description, headless_client_count, additional_params, active_preset_id, game_install_id.
+- Each server has: name, port, query_port, max_players, password, admin_password, description, additional_params, active_preset_id, game_install_id, status, verify_signatures, allowed_file_patching, battle_eye, persistent, von_enabled, additional_server_options.
 - Port uniqueness is validated across both `port` and `query_port` columns for all servers.
-- Servers can be started, stopped, and restarted from the web UI.
+- Servers are started/stopped via queued jobs (`StartServerJob`, `StopServerJob`) dispatched from the web UI.
 - `Server::getBinaryPath()` derives the server binary path from the linked `GameInstall`.
-- `server.cfg` is regenerated on every server start by `ServerProcessService::generateServerConfig()`, so config changes take effect immediately.
+- On every server start, `ServerProcessService` regenerates `server.cfg`, `server_basic.cfg`, and the `.Arma3Profile` difficulty file, symlinks mods and missions, copies BiKeys, and creates an automatic `.vars.Arma3Profile` backup.
+- Server status transitions through: Stopped → Starting → Booting → Running (and Stopping when shutting down). The `Booting` → `Running` transition is detected by `DetectServerBooted` listener when the server log contains "Connected to Steam servers".
+- Shared form fields are extracted into `resources/views/pages/servers/partials/form-fields.blade.php`.
 
 ### Workshop Mods
 - Mods are identified by their Steam Workshop ID (numeric).
-- Mods are downloaded using SteamCMD as queued Laravel jobs (one job per mod, `DownloadModJob`).
+- Mods can be downloaded individually (`DownloadModJob`) or in batches (`BatchDownloadModsJob`) via SteamCMD as queued Laravel jobs.
 - Each mod has: `workshop_id`, `name`, `file_size`, `installation_status` (`InstallationStatus` enum), `progress_pct` (0–100), `installed_at`.
 - **Progress tracking**: SteamCMD does NOT output progress lines for workshop downloads. Progress is tracked by polling `du -sb` on the mod directory every 1 second while the SteamCMD process runs asynchronously (`Process::start()` + `while ($process->running())`). `progress_pct` is written to DB (throttled every 1 percentage point) using `updateQuietly`.
 - Progress and SteamCMD output are broadcast via `ModDownloadOutput` event for real-time UI updates.
-- Mod metadata (name, file size) is fetched from the Steam Workshop API before download begins.
+- Mod metadata (name, file size) is fetched from the Steam Workshop API before download begins. Bulk metadata fetching is supported via `SteamWorkshopService::getMultipleModDetails()`.
 - On completion, actual disk size is recorded via `du -sb` on the mod directory.
-- Mod files need to be converted to lowercase (Linux requirement for Arma 3).
+- Mod files need to be converted to lowercase (Linux requirement for Arma 3) — handled by the `InteractsWithFileSystem` trait.
 - Mods are symlinked into server directories when assigned via presets.
 
 ### Mod Presets
 - A preset is a named collection of workshop mods.
 - Presets can be created manually (selecting individual mods) or by importing an Arma 3 Launcher HTML preset file.
-- When importing an HTML preset, the system parses mod IDs from the file and queues individual download jobs for each mod.
+- When importing an HTML preset, the system parses mod IDs from the file and dispatches batched download jobs (batch size configured via `SteamAccount::mod_download_batch_size`). Single-mod batches use `DownloadModJob`, multi-mod batches use `BatchDownloadModsJob`.
 - A server instance uses one active preset at a time.
 - Presets can be shared across multiple server instances.
 - Presets have separate create and edit pages (unlike servers which use inline panels).
+- Shared form fields are extracted into `resources/views/pages/presets/partials/form-fields.blade.php`.
 
 ### Missions (PBO Files)
 - PBO (Packed Bank of Files) mission files uploaded by users and stored in a shared pool (`missions_base_path`).
@@ -342,47 +347,72 @@ ArmaMan is a web-based Arma 3 dedicated server manager built with Laravel 12, Li
 - Livewire `WithFileUploads` trait handles file uploads; max upload size configured to 512MB in `config/livewire.php`.
 
 ### Headless Clients
-- Each Arma 3 server instance can have headless clients launched alongside it.
+- Each Arma 3 server instance can have headless clients launched alongside it (max 10).
 - Headless clients offload AI processing from the main server.
 - They connect to the server automatically using the server's configured password.
-- Users can start/stop headless clients per server from the UI.
+- HC management is dynamic: users add/remove individual HCs from the UI via `ServerProcessService::addHeadlessClient()` and `removeHeadlessClient()`.
+- On server restart, the previous HC count is automatically restored.
+
+### Server Backups
+- `ServerBackupService` manages `.vars.Arma3Profile` file backups per server.
+- An automatic backup is created on every server start.
+- Users can manually create named backups, upload backup data, download, and restore backups.
+- Old backups are auto-pruned based on `config('arma.max_backups_per_server')` (default: 20).
+- Backups are stored in the `server_backups` table via the `ServerBackup` model.
+
+### Server Difficulty Settings
+- Each server has a `DifficultySettings` model (one-to-one relationship) that configures Arma 3 difficulty options.
+- Settings include: reduced_damage, group_indicators, friendly_tags, enemy_tags, detected_mines, commands, waypoints, tactical_ping, weapon_info, stance_indicator, stamina_bar, weapon_crosshair, vision_aid, third_person_view, camera_shake, score_table, death_messages, von_id, map_content, auto_report, ai_level_preset, skill_ai, precision_ai.
+- On server start, `ServerProcessService::generateProfileConfig()` writes these settings to the `.Arma3Profile` file.
 
 ### SteamCMD Integration
 - SteamCMD is the command-line tool used to download server files and workshop mods.
 - SteamCMD commands are executed as queued jobs to prevent blocking the web UI.
-- Steam credentials (username, encrypted password, auth_token, steam_api_key) are managed via a settings page and stored encrypted in the database (`SteamAccount` model).
+- Steam credentials (username, encrypted password, auth_token, steam_api_key, mod_download_batch_size) are managed via a settings page and stored encrypted in the database (`SteamAccount` model).
 - The SteamCMD binary path is configurable via `STEAMCMD_PATH` env var (default: `/usr/games/steamcmd`).
 - Arma 3 server Steam App ID: 233780 (hardcoded in `config/arma.php` as `server_app_id`)
 - Arma 3 game ID (for workshop mods): 107410 (hardcoded in `config/arma.php` as `game_id`)
 - `SteamCmdService::installServer()` accepts an optional `?callable $onOutput` and streams output line-by-line.
 - `SteamCmdService::startDownloadMod()` starts the process asynchronously and returns an `InvokedProcess` for polling.
-- `SteamCmdService::downloadMod()` (sync, no callback) still exists but is not used by the job.
+- `SteamCmdService::startBatchDownloadMods()` stacks multiple `+workshop_download_item` commands in a single SteamCMD invocation; timeout scales at 1hr per mod.
 
 ## Architecture Decisions
 
 ### Queue-Based Downloads
 - All SteamCMD operations run as queued Laravel jobs.
-- Each mod download is a separate job so progress can be tracked individually.
+- Mods can be downloaded individually (`DownloadModJob`) or in batches (`BatchDownloadModsJob`).
+- Batch downloads use a single SteamCMD invocation with multiple `+workshop_download_item` commands.
+- Server start/stop operations are also queued (`StartServerJob`, `StopServerJob`).
 - The queue worker processes one job at a time to avoid SteamCMD conflicts.
 - Uses the `database` queue driver (already configured).
 
 ### Real-Time Updates via WebSocket (Laravel Reverb + Echo)
 - Laravel Reverb provides the WebSocket server; Laravel Echo (with pusher-js) handles client subscriptions.
-- Three broadcast events push real-time data from jobs/commands to the UI:
+- Nginx reverse-proxies `/app` and `/apps` paths to Reverb internally (port 6001, bound to 127.0.0.1) — no second port needed.
+- `resources/js/app.js` derives `wsHost`, `wsPort`, and `forceTLS` from `window.location` at runtime, so the connection works on any external port/protocol without baked-in VITE env vars. `VITE_REVERB_APP_KEY` is hardcoded at build time (`armaman-key`).
+- Four broadcast events push real-time data from jobs/commands to the UI:
   - `GameInstallOutput` — SteamCMD log lines + progress for game installs (channel: `game-install.{id}`)
   - `ModDownloadOutput` — progress + SteamCMD output for mod downloads (channel: `mod-download.{id}`)
   - `ServerLogOutput` — server log lines from the `server:tail-log` command (channel: `server-log.{id}`)
+  - `ServerStatusChanged` — server status transitions (channel: `servers`, global)
 - All broadcast events implement `ShouldBroadcastNow` (they are already dispatched from queue workers or commands).
-- All channels are public (no authorization needed) — no entries in `routes/channels.php`.
+- All channels are public (no authorization needed) — no ArmaMan-specific entries in `routes/channels.php`.
 - Livewire components use `getListeners()` to dynamically subscribe to per-entity Echo channels (e.g. `echo:game-install.{id},GameInstallOutput`).
 - Game installs and mods pages have **no `wire:poll`** — they rely entirely on Echo events for updates.
 - Servers page uses `wire:poll.5s` for process status checks + Echo for real-time log streaming.
 - Progress (`progress_pct`) is still written to DB by jobs; Echo events carry it too for instant UI updates.
 
+### Event Listeners
+- `DetectServerBooted` listener — listens to `ServerLogOutput` events. When a log line contains "Connected to Steam servers" and the server status is `Booting`, transitions the server to `Running` and dispatches a `ServerStatusChanged` event.
+
 ### Server Config Generation
-- `ServerProcessService::generateServerConfig()` writes `server.cfg` to `getProfilesPath()/server.cfg` before every server start.
-- Maps DB fields: `name` → `hostname`, `password`, `admin_password` → `passwordAdmin`, `max_players` → `maxPlayers`, `description` → `motd[]`.
-- Includes Arma 3 defaults (BattlEye=1, verifySignatures=2, etc.).
+- `ServerProcessService` generates three config files on every server start:
+  - `generateServerConfig()` — writes `server.cfg` to `getProfilesPath()/server.cfg`. Maps DB fields: `name` → `hostname`, `password`, `admin_password` → `passwordAdmin`, `max_players` → `maxPlayers`, `description` → `motd[]`. Includes server options from `additional_server_options`.
+  - `generateBasicConfig()` — writes `server_basic.cfg` (basic Arma 3 server settings).
+  - `generateProfileConfig()` — writes `{profileName}.Arma3Profile` with difficulty settings from the `DifficultySettings` model.
+- `symlinkMods()` — creates `@{normalized_name}` symlinks in the game install directory for each mod in the active preset.
+- `symlinkMissions()` — symlinks all PBOs from the shared missions pool into the game install's `mpmissions/` directory.
+- `copyBiKeys()` — copies BiKey files (`.bikey`) from mod `keys/` directories into the game install's `keys/` directory.
 - Config is always regenerated on start so changes take effect immediately.
 
 ### Server Log Tailing
@@ -398,104 +428,153 @@ ArmaMan is a web-based Arma 3 dedicated server manager built with Laravel 12, Li
 - `flux:select` with a bound integer property: pre-initialise the property in the open method (e.g. `$this->gameInstalls->first()?->id`) to avoid the flux:select null-on-no-interaction bug.
 
 ### File System Layout
-- Game install files: `{SERVERS_BASE_PATH}/game/{game_install_id}/`
-- Workshop mods: `{MODS_BASE_PATH}/steamapps/workshop/content/107410/{workshop_id}/`
-- Mod symlinks into server dirs: `{server_path}/@{normalized_mod_name}`
-- Mission PBOs (shared pool): `{MISSIONS_BASE_PATH}/`
-- Mission symlinks into game installs: `{SERVERS_BASE_PATH}/game/{id}/mpmissions/`
-- All paths are configurable via environment variables.
+- Game install files: `{GAMES_BASE_PATH}/{game_install_id}/` (default: `storage/arma/games/{id}/`)
+- Server profiles/config: `{SERVERS_BASE_PATH}/{server_id}/` (default: `storage/arma/servers/{id}/`)
+- Workshop mods: `{MODS_BASE_PATH}/steamapps/workshop/content/107410/{workshop_id}/` (default: `storage/arma/mods/...`)
+- Mod symlinks into game install dirs: `{game_install_path}/@{normalized_mod_name}`
+- Mission PBOs (shared pool): `{MISSIONS_BASE_PATH}/` (default: `storage/arma/missions/`)
+- Mission symlinks into game installs: `{GAMES_BASE_PATH}/{id}/mpmissions/`
+- All paths fall back to `storage_path('arma/...')` when env vars are not set.
 
 ### Docker Deployment
-- The application ships as a single Docker container.
-- The container includes: PHP-FPM, Nginx, SteamCMD, Node.js (for asset building), SQLite.
-- Supervisord manages: Nginx, PHP-FPM, the Laravel queue worker, and Laravel Reverb (WebSocket server on port 8080).
-- Storage volumes for: database, server files, mod files, mission files, Laravel storage.
-- A `docker-compose.yml` is provided for easy deployment.
-- `storage/arma/servers`, `storage/arma/mods`, and `storage/arma/missions` are gitignored.
+- The application ships as a single Docker container based on `cm2network/steamcmd`.
+- Multi-stage Dockerfile: `node:24-alpine` (LTS) builds frontend assets, `cm2network/steamcmd` is the runtime base.
+- The container includes: PHP 8.5 FPM/CLI, Nginx, SteamCMD, Supervisor, SQLite.
+- Uses `network_mode: host` — the container shares the host's network stack so dynamically-configured Arma 3 server ports are accessible without pre-declaring port mappings.
+- Supervisord manages: Nginx, PHP-FPM, the Laravel queue worker (database driver), and Laravel Reverb (WebSocket server on 127.0.0.1:6001 internally).
+- Nginx listens on a configurable port via `APP_PORT` env var (default: 8080). The entrypoint uses `sed` to set the port at startup.
+- Nginx reverse-proxies `/app` and `/apps` paths to Reverb at 127.0.0.1:6001 — no second external port needed for WebSockets.
+- `docker/entrypoint.sh` runs on container start: resolves/persists `APP_KEY` and `REVERB_APP_SECRET` to the storage volume, configures Nginx port, creates storage dirs, ensures SQLite DB exists, runs migrations, creates initial admin user (if `ADMIN_EMAIL`/`ADMIN_PASSWORD` set), caches config/routes/views, then starts supervisord.
+- `APP_KEY` persistence: env var > `storage/.app_key` file > auto-generate. Survives container recreations without user intervention.
+- `REVERB_APP_SECRET` persistence: auto-generated via `openssl rand -hex 32` on first boot, persisted to `storage/.reverb_secret`.
+- `docker/php.ini` configures 512MB upload limits (aligned with Livewire config), copied to both FPM and CLI conf.d.
+- `docker/nginx.conf` sets `client_max_body_size 520M` (aligned with `post_max_size`).
+- Single bind-mount volume in `docker-compose.yml`:
+  - `./storage:/var/www/html/storage` — all game installs, server profiles, mods, missions, logs, cache, SQLite database, persisted keys (everything under `storage/`)
+- The SQLite database lives at `storage/database.sqlite` in Docker (set via `DB_DATABASE` env var in entrypoint). This keeps everything in a single volume. Local dev still uses `database/database.sqlite` (the default).
+- No custom path env vars (`GAMES_BASE_PATH`, etc.) needed in Docker — config falls back to `storage_path('arma/...')`.
+- All Reverb/broadcast config has sensible defaults hardcoded in `config/reverb.php` and `config/broadcasting.php` — no Reverb env vars needed in docker-compose.
+- `VITE_REVERB_APP_KEY` is hardcoded at build time (`armaman-key`). Host/port/scheme are derived from `window.location` at runtime.
+- `storage/arma/games`, `storage/arma/servers`, `storage/arma/mods`, and `storage/arma/missions` are gitignored.
 
 ### Environment Variables (Custom)
-- `STEAMCMD_PATH` - Path to SteamCMD executable (default: `/usr/games/steamcmd`)
+- `STEAMCMD_PATH` - Path to SteamCMD executable (default: `/usr/games/steamcmd`, Docker: `/home/steam/steamcmd/steamcmd.sh`)
 - `STEAM_API_KEY` - Steam Web API key for fetching workshop mod metadata
-- `SERVERS_BASE_PATH` - Base directory for game install downloads
-- `MODS_BASE_PATH` - Base directory for mod downloads
-- `MISSIONS_BASE_PATH` - Base directory for uploaded PBO mission files
+- `GAMES_BASE_PATH` - Base directory for game install downloads (default: `storage_path('arma/games')`)
+- `SERVERS_BASE_PATH` - Base directory for server profiles/config (default: `storage_path('arma/servers')`)
+- `MODS_BASE_PATH` - Base directory for mod downloads (default: `storage_path('arma/mods')`)
+- `MISSIONS_BASE_PATH` - Base directory for uploaded PBO mission files (default: `storage_path('arma/missions')`)
+- `MAX_BACKUPS_PER_SERVER` - Max `.vars.Arma3Profile` backups per server (default: 20, set to 0 for unlimited)
+
+### Environment Variables (Docker)
+- `APP_PORT` - Port Nginx listens on (default: `8080`)
+- `ADMIN_EMAIL` - Email for initial admin user (created on first boot if no users exist)
+- `ADMIN_PASSWORD` - Password for initial admin user
+- `ADMIN_NAME` - Name for initial admin user (default: `Admin`)
 
 ## Data Model
 
 ### Core Models
 - `GameInstall` - A downloaded Arma 3 server installation (name, branch, installation_status, progress_pct, disk_size_bytes, installed_at)
-- `Server` - Arma 3 server instance (name, port, query_port, max_players, password, admin_password, description, active_preset_id, game_install_id, headless_client_count, additional_params)
+- `Server` - Arma 3 server instance (name, port, query_port, max_players, password, admin_password, description, active_preset_id, game_install_id, status, additional_params, verify_signatures, allowed_file_patching, battle_eye, persistent, von_enabled, additional_server_options)
+- `DifficultySettings` - Per-server Arma 3 difficulty options (server_id, reduced_damage, group_indicators, friendly_tags, enemy_tags, detected_mines, commands, waypoints, tactical_ping, weapon_info, stance_indicator, stamina_bar, weapon_crosshair, vision_aid, third_person_view, camera_shake, score_table, death_messages, von_id, map_content, auto_report, ai_level_preset, skill_ai, precision_ai)
+- `ServerBackup` - `.vars.Arma3Profile` backup (server_id, name, file_size, is_automatic, data)
 - `WorkshopMod` - A Steam Workshop mod (workshop_id, name, file_size, installation_status, progress_pct, installed_at)
 - `ModPreset` - A named collection of mods (name)
 - `mod_preset_workshop_mod` - Pivot table (mod_preset_id, workshop_mod_id)
-- `SteamAccount` - Steam credentials for SteamCMD (username, encrypted password, encrypted auth_token, encrypted steam_api_key)
+- `SteamAccount` - Steam credentials for SteamCMD (username, encrypted password, encrypted auth_token, encrypted steam_api_key, mod_download_batch_size)
 
 ### Enums
-- `InstallationStatus` - Queued, Installing, Installed, Failed (used by `WorkshopMod`)
-- `GameInstallStatus` - Queued, Installing, Installed, Failed (used by `GameInstall`)
-- `ServerStatus` - Stopped, Starting, Running, Stopping
+- `InstallationStatus` - Queued, Installing, Installed, Failed (used by both `GameInstall` and `WorkshopMod`)
+- `ServerStatus` - Stopped, Starting, Booting, Running, Stopping
 
 ## Key Files
 
 ### Models
-- `app/Models/GameInstall.php` — `getInstallationPath(): string` returns `{servers_base_path}/game/{id}`
-- `app/Models/Server.php` — `gameInstall(): BelongsTo`, `activePreset(): BelongsTo`, `getInstallationPath(): string`, `getProfilesPath(): string`, `getBinaryPath(): string`
+- `app/Models/GameInstall.php` — `servers(): HasMany`, `getInstallationPath(): string` returns `{games_base_path}/{id}`
+- `app/Models/Server.php` — `gameInstall(): BelongsTo`, `activePreset(): BelongsTo`, `difficultySettings(): HasOne`, `backups(): HasMany`, `getProfilesPath(): string`, `getBinaryPath(): string`, `getProfileName(): string`
+- `app/Models/DifficultySettings.php` — `server(): BelongsTo`, stores per-server Arma 3 difficulty options
+- `app/Models/ServerBackup.php` — `server(): BelongsTo`, stores `.vars.Arma3Profile` backup data
 - `app/Models/WorkshopMod.php` — `presets(): BelongsToMany`, `getInstallationPath(): string`, `getNormalizedName(): string`
 - `app/Models/ModPreset.php` — `mods(): BelongsToMany`, `servers(): HasMany`
-- `app/Models/SteamAccount.php` — stores encrypted credentials (password, auth_token, steam_api_key)
+- `app/Models/SteamAccount.php` — stores encrypted credentials (password, auth_token, steam_api_key), `mod_download_batch_size`, `static current(): ?self`
 
 ### Services
-- `app/Services/SteamCmdService.php` — `installServer(dir, branch, ?callable): ProcessResult`, `startDownloadMod(dir, id): InvokedProcess`, `downloadMod(dir, id): ProcessResult`, `validateCredentials(user, pass): bool`
-- `app/Services/SteamWorkshopService.php` — `getModDetails(id): ?array`, `validateApiKey(key): array`, `getApiKey(): ?string`
-- `app/Services/ServerProcessService.php` — `start()`, `stop()`, `restart()`, `isRunning()`, `getStatus()`, `startHeadlessClients()`, `stopHeadlessClients()`, `generateServerConfig()`, `symlinkMissions()`, `startLogTail()`, `stopLogTail()`
-- `app/Services/PresetImportService.php` — `parseHtmlPreset(html): Collection`, `parsePresetName(html): ?string`, `importFromHtml(html, ?name): ModPreset`
+- `app/Services/SteamCmdService.php` — `installServer(dir, branch, ?callable): ProcessResult`, `startDownloadMod(dir, id): InvokedProcess`, `startBatchDownloadMods(dir, ids[]): InvokedProcess`, `validateCredentials(user, pass): bool`
+- `app/Services/SteamWorkshopService.php` — `getModDetails(id): ?array`, `getMultipleModDetails(ids[]): array`, `validateApiKey(key): array`, `getApiKey(): ?string`
+- `app/Services/ServerProcessService.php` — `start(Server)`, `stop(Server)`, `restart(Server)`, `isRunning(Server): bool`, `getStatus(Server): ServerStatus`, `addHeadlessClient(Server): ?int`, `removeHeadlessClient(Server): ?int`, `stopAllHeadlessClients(Server)`, `getRunningHeadlessClientCount(Server): int`, `buildLaunchCommand(Server): string`, `getServerLogPath(Server): string`, `getHeadlessClientLogPath(Server, int): string`
+- `app/Services/ServerBackupService.php` — `getVarsFilePath(Server): string`, `createFromServer(Server, ?name, isAutomatic): ?ServerBackup`, `createFromUpload(Server, data, ?name): ServerBackup`, `restore(ServerBackup)`, `pruneOldBackups(Server)`
+- `app/Services/PresetImportService.php` — `parseHtmlPreset(html): Collection`, `parsePresetName(html): ?string`, `importFromHtml(html, ?name): ModPreset`, `dispatchBatchedDownloads(Collection)`
 
 ### Broadcast Events
 - `app/Events/GameInstallOutput.php` — broadcasts on `game-install.{id}`, carries `gameInstallId`, `progressPct`, `line`
 - `app/Events/ModDownloadOutput.php` — broadcasts on `mod-download.{id}`, carries `modId`, `progressPct`, `line`
 - `app/Events/ServerLogOutput.php` — broadcasts on `server-log.{id}`, carries `serverId`, `line`
+- `app/Events/ServerStatusChanged.php` — broadcasts on `servers` (global), carries `serverId`, `status`
+
+### Listeners
+- `app/Listeners/DetectServerBooted.php` — listens to `ServerLogOutput`; transitions server from `Booting` to `Running` when log contains "Connected to Steam servers"
 
 ### Console Commands
 - `app/Console/Commands/TailServerLog.php` — `server:tail-log {server}`, tails server.log, broadcasts via `ServerLogOutput`, handles file rotation
+- `app/Console/Commands/CreateAdminUser.php` — `user:create-admin --email= --password= [--name=]`, creates an initial admin user if no users exist (used by Docker entrypoint)
 
 ### Jobs
 - `app/Jobs/InstallServerJob.php` — installs a `GameInstall`; streams SteamCMD output; parses `progress:` lines; throttled DB writes (every 1 pct); broadcasts `GameInstallOutput` events; tries=2, timeout=7200s
-- `app/Jobs/DownloadModJob.php` — downloads a `WorkshopMod`; uses `startDownloadMod()` (async); polls `du -sb` every 1s; throttled DB writes (every 1 pct); broadcasts `ModDownloadOutput` events; tries=2, timeout=3600s
+- `app/Jobs/DownloadModJob.php` — downloads a single `WorkshopMod`; uses `startDownloadMod()` (async); polls `du -sb` every 1s; throttled DB writes (every 1 pct); broadcasts `ModDownloadOutput` events; tries=2, timeout=3600s
+- `app/Jobs/BatchDownloadModsJob.php` — downloads multiple `WorkshopMod`s in a single SteamCMD invocation; polls all mod directories; broadcasts per-mod `ModDownloadOutput` events; tries=2, timeout=1hr per mod
+- `app/Jobs/StartServerJob.php` — starts a server (or restarts with HC restoration); sets status to `Booting`; tries=1
+- `app/Jobs/StopServerJob.php` — stops all HCs then the server; sets status to `Stopped`; tries=1, timeout=30s
+- `app/Jobs/Concerns/InteractsWithFileSystem.php` — trait providing `getDirectorySize(path): int` and `convertToLowercase(path)`
 
 ### Pages (Livewire single-file)
 - `resources/views/pages/game-installs/index.blade.php` — game installs list, create modal, reinstall/delete, collapsible log viewer per install, Echo listeners (no wire:poll)
 - `resources/views/pages/servers/index.blade.php` — server list with inline create modal + configure panel, game install dropdown (required), log viewer panel, `wire:poll.5s` for status + Echo for logs
+- `resources/views/pages/servers/partials/form-fields.blade.php` — shared server form fields partial
 - `resources/views/pages/mods/index.blade.php` — mod list, add by workshop ID, progress bar, collapsible log viewer per mod in table rows, Echo listeners (no wire:poll)
 - `resources/views/pages/presets/index.blade.php` — preset list, delete
 - `resources/views/pages/presets/create.blade.php` — create preset with mod selection + HTML import
 - `resources/views/pages/presets/edit.blade.php` — edit preset, manage mods
+- `resources/views/pages/presets/partials/form-fields.blade.php` — shared preset form fields partial
 - `resources/views/pages/missions/index.blade.php` — mission PBO upload/download/delete, upload progress bar, filesystem-based (no DB model)
-- `resources/views/pages/steam-settings.blade.php` — manage Steam credentials and API key
+- `resources/views/pages/steam-settings.blade.php` — manage Steam credentials, API key, and mod download batch size
 
 ### Frontend / JS
-- `resources/js/app.js` — Laravel Echo configured for Reverb (pusher-js transport)
+- `resources/js/app.js` — Laravel Echo configured for Reverb (pusher-js transport). Uses `window.location` for wsHost/wsPort/forceTLS at runtime (no baked VITE vars needed for host/port/scheme). `VITE_REVERB_APP_KEY` is hardcoded at build time (`armaman-key`).
 
 ### Config
-- `config/arma.php` — `steamcmd_path`, `steam_api_key`, `servers_base_path`, `mods_base_path`, `missions_base_path`, `server_app_id` (233780), `game_id` (107410)
-- `config/broadcasting.php` — Reverb connection configured
-- `config/reverb.php` — published Reverb config
+- `config/arma.php` — `steamcmd_path`, `steam_api_key`, `games_base_path`, `servers_base_path`, `mods_base_path`, `missions_base_path`, `server_app_id` (233780), `game_id` (107410), `max_backups_per_server`
+- `config/broadcasting.php` — Reverb connection configured (defaults to `reverb` driver with hardcoded credentials)
+- `config/reverb.php` — published Reverb config (server defaults to 127.0.0.1:6001)
 - `config/livewire.php` — `emoji => false`, `temporary_file_upload.rules` set to 512MB max
 
 ### Docker
-- `docker/supervisord.conf` — nginx, php-fpm, queue-worker (database driver), reverb (port 8080)
-- `docker-compose.yml` — single container deployment
+- `Dockerfile` — Multi-stage build: `composer-deps` → `frontend` (node:24-alpine) → `runtime` (cm2network/steamcmd + PHP 8.5). `VITE_REVERB_APP_KEY` hardcoded as ENV
+- `docker-compose.yml` — single service, `network_mode: host`, single `./storage` volume, minimal env vars (`APP_PORT`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`)
+- `docker/entrypoint.sh` — APP_KEY + REVERB_APP_SECRET generation/persistence, Nginx port config, storage dir setup, DB migration, initial admin user creation, config/route/view caching, supervisord launch
+- `docker/supervisord.conf` — nginx, php-fpm, queue-worker (database driver), reverb (127.0.0.1:6001)
+- `docker/nginx.conf` — serves app on port 80 (rewritten to APP_PORT by entrypoint), reverse-proxies `/app` and `/apps` to Reverb at 127.0.0.1:6001, `client_max_body_size 520M`
+- `docker/php.ini` — `upload_max_filesize=512M`, `post_max_size=520M`
 
 ### Tests
 - `tests/Feature/GameInstalls/GameInstallManagementTest.php`
 - `tests/Feature/Servers/ServerManagementTest.php`
-- `tests/Feature/Servers/ServerProcessServiceTest.php` — server.cfg generation + mission symlink tests
+- `tests/Feature/Servers/ServerProcessServiceTest.php` — server.cfg generation, mission symlink, mod symlink, BiKey copy tests
+- `tests/Feature/Servers/ServerBackupManagementTest.php` — backup UI tests
+- `tests/Feature/Servers/ServerBackupServiceTest.php` — backup service unit tests
 - `tests/Feature/Missions/MissionManagementTest.php` — PBO upload, download, delete, path traversal protection
 - `tests/Feature/Mods/WorkshopModManagementTest.php`
 - `tests/Feature/Jobs/DownloadModJobTest.php` — mocks `SteamCmdService::startDownloadMod()` returning a mock `InvokedProcess`; uses `Process::fake(['du *' => ...])` for disk size
+- `tests/Feature/Jobs/BatchDownloadModsJobTest.php` — tests batched mod downloads
+- `tests/Feature/Jobs/StartServerJobTest.php` — tests server start job
+- `tests/Feature/Jobs/StopServerJobTest.php` — tests server stop job
 - `tests/Feature/Presets/ModPresetManagementTest.php`
 - `tests/Feature/SteamSettings/SteamSettingsTest.php`
 - `tests/Feature/Events/BroadcastEventsTest.php` — broadcast event channel and property tests
-- `tests/Unit/Services/PresetImportServiceTest.php`
+- `tests/Feature/Listeners/DetectServerBootedTest.php` — tests Booting → Running transition
+- `tests/Feature/Services/PresetImportServiceTest.php`
+- `tests/Concerns/MocksSteamCmdProcess.php` — trait providing `makeInvokedProcess(bool): InvokedProcess`
+- `tests/Concerns/MocksServerProcessService.php` — trait providing `mockServerProcessService(ServerStatus): void`
 
 ## SteamCMD Commands Reference
 
@@ -506,16 +585,25 @@ steamcmd +force_install_dir {install_path} +login {username} {password} +app_upd
 steamcmd +force_install_dir {install_path} +login {username} {password} +app_update 233780 -beta {branch} validate +quit
 ```
 
-### Download Workshop Mod
+### Download Workshop Mod (single)
 ```
 steamcmd +force_install_dir {mods_base_path} +login {username} {password} +workshop_download_item 107410 {workshop_id} validate +quit
+```
+
+### Download Workshop Mods (batch)
+```
+steamcmd +force_install_dir {mods_base_path} +login {username} {password} +workshop_download_item 107410 {id1} +workshop_download_item 107410 {id2} validate +quit
 ```
 
 ## Testing Notes
 - Mock `SteamCmdService` directly in job tests (bind via `$this->app->instance()`).
 - For `DownloadModJob` tests: mock `startDownloadMod()` to return a mock `InvokedProcess` with `running()` returning `false` and `wait()` returning a mock `ProcessResult`. Use `Process::fake(['du *' => Process::result('SIZE\t/path')])` to fake disk size reads.
+- For `BatchDownloadModsJob` tests: mock `startBatchDownloadMods()` similarly. The job polls multiple mod directories simultaneously.
 - For `InstallServerJob` tests: mock `installServer()` to invoke the callback with fake output lines if testing progress parsing.
+- For `StartServerJob`/`StopServerJob` tests: mock `ServerProcessService` methods.
 - `setUp()` in `ServerManagementTest` always creates a `GameInstall` — tests that need `createGameInstallId` to be null must explicitly `->set('createGameInstallId', null)` after `openCreateModal`.
+- Use `MocksSteamCmdProcess` trait for creating mock `InvokedProcess` instances.
+- Use `MocksServerProcessService` trait for mocking `ServerProcessService` in Livewire component tests.
 - `SteamWorkshopService` no longer has `getDownloadProgress()` or `getDownloadedSize()` — do not mock them.
-- Broadcast events use `ShouldBroadcastNow` — when testing dispatches from jobs, use `Event::fake([SpecificEvent::class])` to avoid breaking other event-driven behavior.
+- Broadcast events use `ShouldBroadcastNow` — when testing dispatches from jobs, use `Event::fake([SpecificEvent::class])` to avoid breaking other event-driven behavior (especially `DetectServerBooted` listener).
 - `Process::fake()` does not intercept `rm -rf` calls in Livewire component tests reliably — use real filesystem + `assertDirectoryDoesNotExist` instead.

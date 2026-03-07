@@ -164,6 +164,9 @@ new #[Title('Game Installs')] class extends Component
                             </div>
                             <flux:text class="mt-1">
                                 {{ __('Branch') }}: <span class="font-mono">{{ $install->branch }}</span>
+                                @if ($install->build_id)
+                                    &middot; {{ __('Build') }}: <span class="font-mono">{{ $install->build_id }}</span>
+                                @endif
                                 @if ($install->disk_size_bytes > 0)
                                     &middot; {{ number_format($install->disk_size_bytes / 1073741824, 1) }} GB
                                 @endif

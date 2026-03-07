@@ -69,6 +69,11 @@ class Server extends Model
         return $this->hasOne(DifficultySettings::class);
     }
 
+    public function networkSettings(): HasOne
+    {
+        return $this->hasOne(NetworkSettings::class);
+    }
+
     public function backups(): HasMany
     {
         return $this->hasMany(ServerBackup::class)->latest();

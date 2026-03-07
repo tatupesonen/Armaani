@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\ServerStatus;
 use App\Models\DifficultySettings;
+use App\Models\NetworkSettings;
 use App\Models\Server;
 use Illuminate\Support\Facades\Log;
 
@@ -358,26 +359,70 @@ class ServerProcessService
      */
     protected function generateBasicConfig(Server $server): void
     {
+        $settings = $server->networkSettings ?? $this->getDefaultNetworkSettings();
+
         $lines = [];
 
         $lines[] = '// BASIC NETWORK CONFIGURATION';
-        $lines[] = 'MaxMsgSend = 128;';
-        $lines[] = 'MaxSizeGuaranteed = 512;';
-        $lines[] = 'MaxSizeNonguaranteed = 256;';
-        $lines[] = 'MinBandwidth = 131072;';
-        $lines[] = 'MaxBandwidth = 10000000000;';
-        $lines[] = 'MinErrorToSend = 0.001;';
-        $lines[] = 'MinErrorToSendNear = 0.01;';
-        $lines[] = 'MaxCustomFileSize = 0;';
+        $lines[] = 'MaxMsgSend = '.$settings->max_msg_send.';';
+        $lines[] = 'MaxSizeGuaranteed = '.$settings->max_size_guaranteed.';';
+        $lines[] = 'MaxSizeNonguaranteed = '.$settings->max_size_nonguaranteed.';';
+        $lines[] = 'MinBandwidth = '.$settings->min_bandwidth.';';
+        $lines[] = 'MaxBandwidth = '.$settings->max_bandwidth.';';
+        $lines[] = 'MinErrorToSend = '.$this->formatDecimal($settings->min_error_to_send).';';
+        $lines[] = 'MinErrorToSendNear = '.$this->formatDecimal($settings->min_error_to_send_near).';';
+        $lines[] = 'MaxCustomFileSize = '.$settings->max_custom_file_size.';';
         $lines[] = '';
         $lines[] = 'class sockets {';
-        $lines[] = '    maxPacketSize = 1400;';
+        $lines[] = '    maxPacketSize = '.$settings->max_packet_size.';';
         $lines[] = '};';
+
+        if ((int) $settings->view_distance > 0) {
+            $lines[] = '';
+            $lines[] = '// SERVER VIEW DISTANCE';
+            $lines[] = 'viewDistance = '.$settings->view_distance.';';
+        }
+
+        if ((float) $settings->terrain_grid > 0) {
+            $lines[] = '';
+            $lines[] = '// TERRAIN GRID';
+            $lines[] = 'terrainGrid = '.$this->formatDecimal($settings->terrain_grid).';';
+        }
 
         file_put_contents(
             $server->getProfilesPath().'/server_basic.cfg',
             implode("\n", $lines)."\n"
         );
+    }
+
+    /**
+     * Build a default NetworkSettings object (not persisted) for servers
+     * that don't have custom network settings configured yet.
+     */
+    protected function getDefaultNetworkSettings(): NetworkSettings
+    {
+        $settings = new NetworkSettings;
+        $settings->max_msg_send = 128;
+        $settings->max_size_guaranteed = 512;
+        $settings->max_size_nonguaranteed = 256;
+        $settings->min_bandwidth = 131072;
+        $settings->max_bandwidth = 10000000000;
+        $settings->min_error_to_send = 0.001;
+        $settings->min_error_to_send_near = 0.01;
+        $settings->max_packet_size = 1400;
+        $settings->max_custom_file_size = 0;
+        $settings->terrain_grid = 25.0;
+        $settings->view_distance = 0;
+
+        return $settings;
+    }
+
+    /**
+     * Format a decimal value for config output, stripping unnecessary trailing zeros.
+     */
+    protected function formatDecimal(string|float $value): string
+    {
+        return rtrim(rtrim(number_format((float) $value, 4, '.', ''), '0'), '.');
     }
 
     /**

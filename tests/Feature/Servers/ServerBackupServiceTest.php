@@ -23,7 +23,7 @@ class ServerBackupServiceTest extends TestCase
     {
         parent::setUp();
 
-        $this->testBasePath = storage_path('app/testing/arma_servers_'.uniqid());
+        $this->testBasePath = sys_get_temp_dir().'/armaman_test_servers_'.uniqid();
         config(['arma.servers_base_path' => $this->testBasePath]);
 
         $this->service = new ServerBackupService;

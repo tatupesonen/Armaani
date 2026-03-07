@@ -110,21 +110,28 @@ class DownloadModJob implements ShouldQueue
     }
 
     /**
-     * Fetch name and expected file size from Steam API if not already set.
+     * Fetch name, expected file size, and last-updated timestamp from Steam API.
+     * Always fetches to keep steam_updated_at current, but only overwrites
+     * name/file_size if they were missing.
      */
     protected function fetchMetadata(SteamWorkshopService $workshop): void
     {
-        if ($this->mod->name && $this->mod->file_size) {
+        $details = $workshop->getModDetails($this->mod->workshop_id);
+
+        if (! $details) {
             return;
         }
 
-        $details = $workshop->getModDetails($this->mod->workshop_id);
+        $updates = array_filter([
+            'name' => $this->mod->name ?? $details['name'],
+            'file_size' => $this->mod->file_size ?? $details['file_size'],
+            'steam_updated_at' => isset($details['time_updated'])
+                ? \Carbon\Carbon::createFromTimestamp($details['time_updated'])
+                : null,
+        ]);
 
-        if ($details) {
-            $this->mod->update(array_filter([
-                'name' => $this->mod->name ?? $details['name'],
-                'file_size' => $this->mod->file_size ?? $details['file_size'],
-            ]));
+        if (! empty($updates)) {
+            $this->mod->update($updates);
         }
     }
 }

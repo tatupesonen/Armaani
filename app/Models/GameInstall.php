@@ -15,6 +15,7 @@ class GameInstall extends Model
     protected $fillable = [
         'name',
         'branch',
+        'build_id',
         'installation_status',
         'progress_pct',
         'disk_size_bytes',

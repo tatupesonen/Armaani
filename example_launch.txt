@@ -1,1 +1,0 @@
-"-config=D:\ARMASERVERINSTALL\Servers_3408ca55405547108962f4ee26d20bfc\server_config.cfg" "-cfg=D:\ARMASERVERINSTALL\Servers_3408ca55405547108962f4ee26d20bfc\server_basic.cfg" "-profiles=D:\ARMASERVERINSTALL\Servers_3408ca55405547108962f4ee26d20bfc"

@@ -6,6 +6,7 @@ use App\Jobs\DownloadModJob;
 use App\Livewire\Concerns\AuditsActions;
 use App\Models\SteamAccount;
 use App\Models\WorkshopMod;
+use App\Services\SteamWorkshopService;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -82,6 +83,12 @@ new #[Title('Workshop Mods')] class extends Component
     }
 
     #[Computed]
+    public function outdatedMods()
+    {
+        return $this->mods->filter(fn (WorkshopMod $mod) => $mod->isOutdated());
+    }
+
+    #[Computed]
     public function selectableMods()
     {
         return $this->mods->filter(fn (WorkshopMod $mod) => $mod->installation_status !== InstallationStatus::Installing && $mod->installation_status !== InstallationStatus::Queued
@@ -132,7 +139,77 @@ new #[Title('Workshop Mods')] class extends Component
         $this->auditLog('queued update for '.$mods->count().' mods in batches of '.$batchSize);
 
         $this->selectedMods = [];
-        unset($this->mods, $this->failedMods, $this->selectableMods, $this->isAllSelected);
+        unset($this->mods, $this->failedMods, $this->outdatedMods, $this->selectableMods, $this->isAllSelected);
+    }
+
+    public function checkForUpdates(SteamWorkshopService $workshop): void
+    {
+        $installedMods = WorkshopMod::query()
+            ->where('installation_status', InstallationStatus::Installed)
+            ->get();
+
+        if ($installedMods->isEmpty()) {
+            return;
+        }
+
+        $workshopIds = $installedMods->pluck('workshop_id')->all();
+        $detailsMap = $workshop->getMultipleModDetails($workshopIds);
+
+        $updatedCount = 0;
+
+        foreach ($installedMods as $mod) {
+            $details = $detailsMap[$mod->workshop_id] ?? null;
+
+            if ($details && isset($details['time_updated'])) {
+                $mod->updateQuietly([
+                    'steam_updated_at' => \Carbon\Carbon::createFromTimestamp($details['time_updated']),
+                ]);
+                $updatedCount++;
+            }
+        }
+
+        $this->auditLog("checked for updates on {$updatedCount} mods");
+
+        unset($this->mods, $this->outdatedMods);
+
+        $outdatedCount = $this->outdatedMods->count();
+
+        if ($outdatedCount > 0) {
+            session()->flash('status', "{$outdatedCount} mod(s) have updates available.");
+        } else {
+            session()->flash('status', 'All mods are up to date.');
+        }
+    }
+
+    public function updateAllOutdated(): void
+    {
+        $mods = WorkshopMod::query()
+            ->where('installation_status', InstallationStatus::Installed)
+            ->get()
+            ->filter(fn (WorkshopMod $mod) => $mod->isOutdated());
+
+        if ($mods->isEmpty()) {
+            return;
+        }
+
+        $batchSize = SteamAccount::query()->latest()->first()?->mod_download_batch_size ?? 5;
+
+        foreach ($mods as $mod) {
+            $mod->update(['installation_status' => InstallationStatus::Queued, 'progress_pct' => 0]);
+        }
+
+        foreach ($mods->chunk($batchSize) as $batch) {
+            if ($batch->count() === 1) {
+                DownloadModJob::dispatch($batch->first());
+            } else {
+                BatchDownloadModsJob::dispatch($batch);
+            }
+        }
+
+        $this->auditLog('queued update for '.$mods->count().' outdated mods in batches of '.$batchSize);
+
+        $this->selectedMods = [];
+        unset($this->mods, $this->failedMods, $this->outdatedMods, $this->selectableMods, $this->isAllSelected);
     }
 
     public function toggleLogs(int $modId): void
@@ -205,7 +282,7 @@ new #[Title('Workshop Mods')] class extends Component
         }
 
         $this->auditLog('retried all failed mods ('.$failedMods->count().' mods in batches of '.$batchSize.')');
-        unset($this->mods, $this->failedMods);
+        unset($this->mods, $this->failedMods, $this->outdatedMods);
     }
 
     public function deleteMod(WorkshopMod $mod): void
@@ -225,7 +302,7 @@ new #[Title('Workshop Mods')] class extends Component
 
         $this->auditLog("deleted mod '{$mod->name}' ({$mod->workshop_id})");
 
-        unset($this->mods);
+        unset($this->mods, $this->outdatedMods);
     }
 }; ?>
 
@@ -248,8 +325,18 @@ new #[Title('Workshop Mods')] class extends Component
         </form>
 
         <div class="flex items-center gap-2">
+            <flux:button wire:click="checkForUpdates" icon="magnifying-glass">
+                {{ __('Check for Updates') }}
+            </flux:button>
+
+            @if ($this->outdatedMods->isNotEmpty())
+                <flux:button wire:click="updateAllOutdated" wire:confirm="{{ __('Update all :count outdated mods? This will re-download them from Steam Workshop.', ['count' => $this->outdatedMods->count()]) }}" icon="arrow-path" variant="primary">
+                    {{ __('Update All Outdated') }} ({{ $this->outdatedMods->count() }})
+                </flux:button>
+            @endif
+
             @if (count($this->selectedMods) > 0)
-                <flux:button wire:click="updateSelected" wire:confirm="{{ __('Update :count selected mods? This will re-download them from Steam Workshop.', ['count' => count($this->selectedMods)]) }}" icon="arrow-path" variant="primary">
+                <flux:button wire:click="updateSelected" wire:confirm="{{ __('Update :count selected mods? This will re-download them from Steam Workshop.', ['count' => count($this->selectedMods)]) }}" icon="arrow-path">
                     {{ __('Update Selected') }} ({{ count($this->selectedMods) }})
                 </flux:button>
             @endif
@@ -261,6 +348,12 @@ new #[Title('Workshop Mods')] class extends Component
             @endif
         </div>
     </div>
+
+    @if (session('status'))
+        <flux:callout variant="info" class="mb-4">
+            {{ session('status') }}
+        </flux:callout>
+    @endif
 
     @if ($this->mods->isEmpty() && $this->search === '')
         <flux:callout>
@@ -298,6 +391,8 @@ new #[Title('Workshop Mods')] class extends Component
                                 @endif
                             </button>
                         </th>
+                        <th class="px-4 py-3 font-medium">{{ __('Workshop Updated') }}</th>
+                        <th class="px-4 py-3 font-medium">{{ __('Installed') }}</th>
                         <th class="px-4 py-3 font-medium">{{ __('Actions') }}</th>
                     </tr>
                 </thead>
@@ -338,10 +433,23 @@ new #[Title('Workshop Mods')] class extends Component
                                     </div>
                                 </div>
                             @else
+                                <div class="flex items-center gap-1.5">
                                     <flux:badge :variant="$mod->installation_status->badgeVariant()" size="sm">
                                         {{ ucfirst($mod->installation_status->value) }}
                                     </flux:badge>
+                                    @if ($mod->isOutdated())
+                                        <flux:badge variant="warning" size="sm">
+                                            {{ __('Update available') }}
+                                        </flux:badge>
+                                    @endif
+                                </div>
                                 @endif
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap text-xs text-zinc-500 dark:text-zinc-400">
+                                {{ $mod->steam_updated_at?->format('M j, Y H:i') ?? '—' }}
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap text-xs text-zinc-500 dark:text-zinc-400">
+                                {{ $mod->installed_at?->format('M j, Y H:i') ?? '—' }}
                             </td>
                             <td class="px-4 py-3">
                                 <div class="flex items-center gap-2">
@@ -365,7 +473,7 @@ new #[Title('Workshop Mods')] class extends Component
                         <x-slot:log>
                             @if ($this->showLogs[$mod->id] ?? ($mod->installation_status === InstallationStatus::Installing || $mod->installation_status === InstallationStatus::Queued))
                                 <tr wire:key="mod-logs-{{ $mod->id }}">
-                                    <td colspan="6" class="px-4 py-3">
+                                    <td colspan="8" class="px-4 py-3">
                                         <div class="rounded bg-zinc-900 text-zinc-100 p-3 font-mono text-xs max-h-48 overflow-y-auto" x-ref="logContainer">
                                             <template x-if="lines.length === 0">
                                                 <div class="text-zinc-500">{{ __('Waiting for output...') }}</div>

@@ -74,15 +74,17 @@ class InstallServerJob implements ShouldQueue
 
         if ($result->successful()) {
             $diskSize = $this->getDirectorySize($installDir);
+            $buildId = $this->parseBuildId($installDir);
 
             $this->gameInstall->update([
                 'installation_status' => InstallationStatus::Installed,
                 'progress_pct' => 100,
                 'disk_size_bytes' => $diskSize > 0 ? $diskSize : $this->gameInstall->disk_size_bytes,
+                'build_id' => $buildId,
                 'installed_at' => now(),
             ]);
 
-            Log::info("Game install '{$this->gameInstall->name}' completed successfully (disk: {$diskSize} bytes)");
+            Log::info("Game install '{$this->gameInstall->name}' completed successfully (disk: {$diskSize} bytes, build: {$buildId})");
 
             GameInstallOutput::dispatch($this->gameInstall->id, 100, 'Installation completed successfully.');
         } else {
@@ -94,6 +96,30 @@ class InstallServerJob implements ShouldQueue
 
             $this->fail(new \RuntimeException('SteamCMD failed: '.$result->errorOutput()));
         }
+    }
+
+    /**
+     * Parse the build ID from the SteamCMD appmanifest ACF file.
+     */
+    protected function parseBuildId(string $installDir): ?string
+    {
+        $manifestPath = $installDir.'/steamapps/appmanifest_'.config('arma.server_app_id').'.acf';
+
+        if (! file_exists($manifestPath)) {
+            Log::warning("[GameInstall:{$this->gameInstall->id}] Appmanifest not found at {$manifestPath}");
+
+            return null;
+        }
+
+        $contents = file_get_contents($manifestPath);
+
+        if ($contents !== false && preg_match('/"buildid"\s+"(\d+)"/', $contents, $matches)) {
+            return $matches[1];
+        }
+
+        Log::warning("[GameInstall:{$this->gameInstall->id}] Could not parse buildid from {$manifestPath}");
+
+        return null;
     }
 
     public function failed(?\Throwable $exception): void

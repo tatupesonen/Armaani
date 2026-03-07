@@ -1,10 +1,24 @@
+# ---- Install PHP dependencies (needed by both frontend and runtime) ----
+FROM composer:2 AS composer-deps
+
+WORKDIR /app
+COPY composer.json composer.lock ./
+RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist --no-interaction
+
 # ---- Build frontend assets ----
-FROM node:20-alpine AS frontend
+FROM node:24-alpine AS frontend
 
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
+COPY --from=composer-deps /app/vendor vendor
+
+# The Reverb app key is hardcoded — it is an internal credential, not user-configurable.
+# Host, port, and scheme are derived at runtime from window.location
+# since Nginx reverse-proxies /app and /apps to Reverb internally.
+ENV VITE_REVERB_APP_KEY=armaman-key
+
 RUN npm run build
 
 # ---- Application image ----
@@ -17,7 +31,7 @@ USER root
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=UTC
 
-# Install PHP 8.4, Nginx, Supervisor, and SQLite
+# Install PHP 8.5, Nginx, Supervisor, and SQLite
 RUN dpkg --add-architecture i386 \
     && apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
@@ -34,23 +48,28 @@ RUN dpkg --add-architecture i386 \
     && echo "deb [signed-by=/usr/share/keyrings/sury-php.gpg] https://packages.sury.org/php/ $(lsb_release -sc) main" > /etc/apt/sources.list.d/sury-php.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
-    php8.4-fpm \
-    php8.4-cli \
-    php8.4-sqlite3 \
-    php8.4-mbstring \
-    php8.4-xml \
-    php8.4-curl \
-    php8.4-zip \
-    php8.4-bcmath \
-    php8.4-tokenizer \
+    php8.5-fpm \
+    php8.5-cli \
+    php8.5-sqlite3 \
+    php8.5-mbstring \
+    php8.5-xml \
+    php8.5-curl \
+    php8.5-zip \
+    php8.5-bcmath \
+    php8.5-intl \
+    php8.5-tokenizer \
     && apt-get clean autoclean \
     && apt-get autoremove --yes \
     && rm -rf /var/lib/apt/lists/*
 
+# Configure PHP — upload limits for large PBO mission files (aligned with Livewire config)
+COPY docker/php.ini /etc/php/8.5/fpm/conf.d/99-armaman.ini
+COPY docker/php.ini /etc/php/8.5/cli/conf.d/99-armaman.ini
+
 # Configure PHP-FPM
-RUN sed -i 's|^listen = .*|listen = /run/php/php-fpm.sock|' /etc/php/8.4/fpm/pool.d/www.conf \
-    && sed -i 's|^;listen.owner = .*|listen.owner = www-data|' /etc/php/8.4/fpm/pool.d/www.conf \
-    && sed -i 's|^;listen.group = .*|listen.group = www-data|' /etc/php/8.4/fpm/pool.d/www.conf \
+RUN sed -i 's|^listen = .*|listen = /run/php/php-fpm.sock|' /etc/php/8.5/fpm/pool.d/www.conf \
+    && sed -i 's|^;listen.owner = .*|listen.owner = www-data|' /etc/php/8.5/fpm/pool.d/www.conf \
+    && sed -i 's|^;listen.group = .*|listen.group = www-data|' /etc/php/8.5/fpm/pool.d/www.conf \
     && mkdir -p /run/php
 
 # Configure Nginx
@@ -64,29 +83,23 @@ RUN mkdir -p /var/log/supervisor
 WORKDIR /var/www/html
 COPY --chown=www-data:www-data . .
 COPY --from=frontend /app/public/build public/build
+COPY --from=composer-deps /app/vendor vendor
 
-# Install Composer dependencies
+# Finalize Composer autoloader
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
-RUN composer install --no-dev --optimize-autoloader --no-interaction
+RUN composer dump-autoload --optimize --no-interaction
 
 # Set permissions
 RUN chown -R www-data:www-data storage bootstrap/cache \
     && chmod -R 775 storage bootstrap/cache
 
-# Create default SQLite database
-RUN touch database/database.sqlite \
-    && chown www-data:www-data database/database.sqlite
-
-# Storage directories for game installs, server profiles, and mods
-RUN mkdir -p /data/games /data/servers /data/mods \
-    && chown -R www-data:www-data /data
+# Entrypoint script — runs migrations, generates APP_KEY if missing, then starts supervisord
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # SteamCMD is at /home/steam/steamcmd/steamcmd.sh in cm2network image
 ENV STEAMCMD_PATH=/home/steam/steamcmd/steamcmd.sh
-ENV GAMES_BASE_PATH=/data/games
-ENV SERVERS_BASE_PATH=/data/servers
-ENV MODS_BASE_PATH=/data/mods
 
 EXPOSE 80
 
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
