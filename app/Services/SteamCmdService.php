@@ -6,6 +6,7 @@ use App\Enums\GameType;
 use App\Models\SteamAccount;
 use Illuminate\Contracts\Process\ProcessResult;
 use Illuminate\Process\InvokedProcess;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 use RuntimeException;
 
@@ -98,16 +99,41 @@ class SteamCmdService
 
     /**
      * Validate that the given Steam credentials work with SteamCMD.
+     *
+     * SteamCMD may return non-zero exit codes even on successful login,
+     * so we parse the output text for the actual login result.
      */
     public function validateCredentials(string $username, string $password): bool
     {
-        $result = Process::timeout(60)->run([
-            $this->steamcmdPath,
-            '+login', $username, $password,
-            '+quit',
+        Log::info('SteamCMD credential validation starting', [
+            'username' => $username,
+            'steamcmd_path' => $this->steamcmdPath,
         ]);
 
-        return $result->successful();
+        $result = Process::timeout(60)
+            ->env(['HOME' => env('HOME', '/root')])
+            ->run([
+                $this->steamcmdPath,
+                '+login', $username, $password,
+                '+quit',
+            ]);
+
+        $stdout = self::stripAnsi($result->output());
+        $stderr = self::stripAnsi($result->errorOutput());
+
+        Log::info('SteamCMD credential validation result', [
+            'exit_code' => $result->exitCode(),
+            'stdout' => $stdout,
+            'stderr' => $stderr,
+        ]);
+
+        $output = $stdout.' '.$stderr;
+
+        if (preg_match('/Logging in user .+\.\.\.(OK|Logged in OK)/i', $output)) {
+            return true;
+        }
+
+        return false;
     }
 
     /**

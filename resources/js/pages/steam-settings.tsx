@@ -1,4 +1,4 @@
-import { Head, useForm } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
     KeyRound,
@@ -49,8 +49,10 @@ const breadcrumbs: BreadcrumbItem[] = [
 export default function SteamSettings({ account }: Props) {
     const [loginVerified, setLoginVerified] = useState<boolean | null>(null);
     const [loginError, setLoginError] = useState<string | null>(null);
+    const [loginVerifying, setLoginVerifying] = useState(false);
     const [apiKeyVerified, setApiKeyVerified] = useState<boolean | null>(null);
     const [apiKeyError, setApiKeyError] = useState<string | null>(null);
+    const [apiKeyVerifying, setApiKeyVerifying] = useState(false);
 
     const credentialsForm = useForm({
         username: account?.username ?? '',
@@ -71,29 +73,33 @@ export default function SteamSettings({ account }: Props) {
         credentialsForm.post(saveCredentials.url(), { preserveScroll: true });
     }
 
-    function submitVerifyLogin(e: React.FormEvent) {
-        e.preventDefault();
+    function submitVerifyLogin() {
         setLoginVerified(null);
         setLoginError(null);
-        credentialsForm.post(verifyLogin.url(), {
-            preserveScroll: true,
-            onSuccess: (page) => {
-                const flash = (page.props as Record<string, unknown>).flash as
-                    | Record<string, string>
-                    | undefined;
-                if (flash?.success) {
-                    setLoginVerified(true);
-                    setLoginError(null);
-                } else {
+        setLoginVerifying(true);
+        router.post(
+            verifyLogin.url(),
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: (page) => {
+                    const flash = (page.props as Record<string, unknown>)
+                        .flash as Record<string, string> | undefined;
+                    if (flash?.success) {
+                        setLoginVerified(true);
+                        setLoginError(null);
+                    } else {
+                        setLoginVerified(false);
+                        setLoginError(flash?.error ?? 'Verification failed');
+                    }
+                },
+                onError: () => {
                     setLoginVerified(false);
-                    setLoginError(flash?.error ?? 'Verification failed');
-                }
+                    setLoginError('Request failed');
+                },
+                onFinish: () => setLoginVerifying(false),
             },
-            onError: () => {
-                setLoginVerified(false);
-                setLoginError('Request failed');
-            },
-        });
+        );
     }
 
     function submitApiKey(e: React.FormEvent) {
@@ -101,29 +107,33 @@ export default function SteamSettings({ account }: Props) {
         apiKeyForm.post(saveApiKey.url(), { preserveScroll: true });
     }
 
-    function submitVerifyApiKey(e: React.FormEvent) {
-        e.preventDefault();
+    function submitVerifyApiKey() {
         setApiKeyVerified(null);
         setApiKeyError(null);
-        apiKeyForm.post(verifyApiKey.url(), {
-            preserveScroll: true,
-            onSuccess: (page) => {
-                const flash = (page.props as Record<string, unknown>).flash as
-                    | Record<string, string>
-                    | undefined;
-                if (flash?.success) {
-                    setApiKeyVerified(true);
-                    setApiKeyError(null);
-                } else {
+        setApiKeyVerifying(true);
+        router.post(
+            verifyApiKey.url(),
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: (page) => {
+                    const flash = (page.props as Record<string, unknown>)
+                        .flash as Record<string, string> | undefined;
+                    if (flash?.success) {
+                        setApiKeyVerified(true);
+                        setApiKeyError(null);
+                    } else {
+                        setApiKeyVerified(false);
+                        setApiKeyError(flash?.error ?? 'Verification failed');
+                    }
+                },
+                onError: () => {
                     setApiKeyVerified(false);
-                    setApiKeyError(flash?.error ?? 'Verification failed');
-                }
+                    setApiKeyError('Request failed');
+                },
+                onFinish: () => setApiKeyVerifying(false),
             },
-            onError: () => {
-                setApiKeyVerified(false);
-                setApiKeyError('Request failed');
-            },
-        });
+        );
     }
 
     function submitSettings(e: React.FormEvent) {
@@ -247,13 +257,16 @@ export default function SteamSettings({ account }: Props) {
                                                   : 'outline'
                                         }
                                         onClick={submitVerifyLogin}
-                                        disabled={credentialsForm.processing}
+                                        disabled={!account || loginVerifying}
                                         className={
                                             loginVerified === true
                                                 ? 'bg-green-600 text-white hover:bg-green-700'
                                                 : ''
                                         }
                                     >
+                                        {loginVerifying && (
+                                            <Spinner className="mr-2" />
+                                        )}
                                         <ShieldCheck className="mr-2 size-4" />
                                         Verify Login
                                     </Button>
@@ -333,13 +346,19 @@ export default function SteamSettings({ account }: Props) {
                                                   : 'outline'
                                         }
                                         onClick={submitVerifyApiKey}
-                                        disabled={apiKeyForm.processing}
+                                        disabled={
+                                            !account?.has_api_key ||
+                                            apiKeyVerifying
+                                        }
                                         className={
                                             apiKeyVerified === true
                                                 ? 'bg-green-600 text-white hover:bg-green-700'
                                                 : ''
                                         }
                                     >
+                                        {apiKeyVerifying && (
+                                            <Spinner className="mr-2" />
+                                        )}
                                         <ShieldCheck className="mr-2 size-4" />
                                         Verify Key
                                     </Button>

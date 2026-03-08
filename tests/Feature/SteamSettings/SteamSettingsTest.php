@@ -299,26 +299,30 @@ class SteamSettingsTest extends TestCase
     // Verify Login
     // ---------------------------------------------------------------
 
-    public function test_verify_login_calls_steamcmd_and_shows_success(): void
+    public function test_verify_login_uses_stored_credentials_and_shows_success(): void
     {
+        $account = SteamAccount::factory()->create([
+            'username' => 'testuser',
+            'password' => 'testpass',
+        ]);
+
         $mock = Mockery::mock(SteamCmdService::class);
         $mock->shouldReceive('validateCredentials')
-            ->with('testuser', 'testpass')
+            ->with($account->username, $account->password)
             ->once()
             ->andReturn(true);
         $this->app->instance(SteamCmdService::class, $mock);
 
         $this->actingAs($this->user)
-            ->post(route('steam-settings.verify-login'), [
-                'username' => 'testuser',
-                'password' => 'testpass',
-            ])
+            ->post(route('steam-settings.verify-login'))
             ->assertRedirect()
             ->assertSessionHas('success');
     }
 
     public function test_verify_login_shows_failure_on_bad_credentials(): void
     {
+        SteamAccount::factory()->create();
+
         $mock = Mockery::mock(SteamCmdService::class);
         $mock->shouldReceive('validateCredentials')
             ->once()
@@ -326,26 +330,23 @@ class SteamSettingsTest extends TestCase
         $this->app->instance(SteamCmdService::class, $mock);
 
         $this->actingAs($this->user)
-            ->post(route('steam-settings.verify-login'), [
-                'username' => 'baduser',
-                'password' => 'badpass',
-            ])
+            ->post(route('steam-settings.verify-login'))
             ->assertRedirect()
             ->assertSessionHas('error');
     }
 
-    public function test_verify_login_requires_credentials(): void
+    public function test_verify_login_requires_saved_account(): void
     {
         $this->actingAs($this->user)
-            ->post(route('steam-settings.verify-login'), [
-                'username' => '',
-                'password' => '',
-            ])
-            ->assertSessionHasErrors(['username', 'password']);
+            ->post(route('steam-settings.verify-login'))
+            ->assertRedirect()
+            ->assertSessionHas('error', 'Save Steam credentials first.');
     }
 
     public function test_verify_login_handles_exception(): void
     {
+        SteamAccount::factory()->create();
+
         $mock = Mockery::mock(SteamCmdService::class);
         $mock->shouldReceive('validateCredentials')
             ->once()
@@ -353,10 +354,7 @@ class SteamSettingsTest extends TestCase
         $this->app->instance(SteamCmdService::class, $mock);
 
         $this->actingAs($this->user)
-            ->post(route('steam-settings.verify-login'), [
-                'username' => 'user',
-                'password' => 'pass',
-            ])
+            ->post(route('steam-settings.verify-login'))
             ->assertRedirect()
             ->assertSessionHas('error');
     }
@@ -365,34 +363,61 @@ class SteamSettingsTest extends TestCase
     // Verify API Key
     // ---------------------------------------------------------------
 
-    public function test_verify_api_key_calls_workshop_service_and_shows_success(): void
+    public function test_verify_api_key_uses_stored_key_and_shows_success(): void
     {
+        $account = SteamAccount::factory()->withApiKey()->create();
+
         $mock = Mockery::mock(SteamWorkshopService::class);
         $mock->shouldReceive('validateApiKey')
-            ->with('VALID_KEY_123')
+            ->with($account->steam_api_key)
             ->once()
             ->andReturn(['valid' => true, 'error' => null]);
         $this->app->instance(SteamWorkshopService::class, $mock);
 
         $this->actingAs($this->user)
-            ->post(route('steam-settings.verify-api-key'), [
-                'steam_api_key' => 'VALID_KEY_123',
-            ])
+            ->post(route('steam-settings.verify-api-key'))
             ->assertRedirect()
             ->assertSessionHas('success');
     }
 
-    public function test_verify_api_key_requires_key(): void
+    public function test_verify_api_key_shows_failure_on_invalid_key(): void
+    {
+        SteamAccount::factory()->withApiKey()->create();
+
+        $mock = Mockery::mock(SteamWorkshopService::class);
+        $mock->shouldReceive('validateApiKey')
+            ->once()
+            ->andReturn(['valid' => false, 'error' => 'HTTP 403']);
+        $this->app->instance(SteamWorkshopService::class, $mock);
+
+        $this->actingAs($this->user)
+            ->post(route('steam-settings.verify-api-key'))
+            ->assertRedirect()
+            ->assertSessionHas('error');
+    }
+
+    public function test_verify_api_key_requires_saved_account(): void
     {
         $this->actingAs($this->user)
-            ->post(route('steam-settings.verify-api-key'), [
-                'steam_api_key' => '',
-            ])
-            ->assertSessionHasErrors(['steam_api_key']);
+            ->post(route('steam-settings.verify-api-key'))
+            ->assertRedirect()
+            ->assertSessionHas('error', 'Save a Steam API key first.');
+    }
+
+    public function test_verify_api_key_requires_saved_api_key(): void
+    {
+        SteamAccount::factory()->create();
+
+        $this->actingAs($this->user)
+            ->post(route('steam-settings.verify-api-key'))
+            ->assertRedirect()
+            ->assertSessionHas('error', 'Save a Steam API key first.');
     }
 
     public function test_verify_api_key_handles_exception(): void
     {
+        SteamAccount::factory()->withApiKey()->create();
+
         $mock = Mockery::mock(SteamWorkshopService::class);
         $mock->shouldReceive('validateApiKey')
             ->once()
@@ -400,9 +425,7 @@ class SteamSettingsTest extends TestCase
         $this->app->instance(SteamWorkshopService::class, $mock);
 
         $this->actingAs($this->user)
-            ->post(route('steam-settings.verify-api-key'), [
-                'steam_api_key' => 'SOME_KEY',
-            ])
+            ->post(route('steam-settings.verify-api-key'))
             ->assertRedirect()
             ->assertSessionHas('error');
     }

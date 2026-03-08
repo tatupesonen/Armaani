@@ -95,15 +95,16 @@ class SteamSettingsController extends Controller
         return back()->with('success', 'Settings saved.');
     }
 
-    public function verifyLogin(Request $request, SteamCmdService $steamCmd): RedirectResponse
+    public function verifyLogin(SteamCmdService $steamCmd): RedirectResponse
     {
-        $validated = $request->validate([
-            'username' => ['required', 'string'],
-            'password' => ['required', 'string'],
-        ]);
+        $account = SteamAccount::current();
+
+        if (! $account) {
+            return back()->with('error', 'Save Steam credentials first.');
+        }
 
         try {
-            $result = $steamCmd->validateCredentials($validated['username'], $validated['password']);
+            $result = $steamCmd->validateCredentials($account->username, $account->password);
 
             if ($result) {
                 return back()->with('success', 'Steam login verified successfully.');
@@ -115,20 +116,22 @@ class SteamSettingsController extends Controller
         }
     }
 
-    public function verifyApiKey(Request $request, SteamWorkshopService $workshop): RedirectResponse
+    public function verifyApiKey(SteamWorkshopService $workshop): RedirectResponse
     {
-        $validated = $request->validate([
-            'steam_api_key' => ['required', 'string'],
-        ]);
+        $account = SteamAccount::current();
+
+        if (! $account || empty($account->steam_api_key)) {
+            return back()->with('error', 'Save a Steam API key first.');
+        }
 
         try {
-            $result = $workshop->validateApiKey($validated['steam_api_key']);
+            $result = $workshop->validateApiKey($account->steam_api_key);
 
-            if ($result) {
+            if ($result['valid']) {
                 return back()->with('success', 'Steam API key verified successfully.');
             }
 
-            return back()->with('error', 'Steam API key verification failed.');
+            return back()->with('error', 'Steam API key verification failed: '.($result['error'] ?? 'Unknown error'));
         } catch (\Exception $e) {
             return back()->with('error', 'Verification error: '.$e->getMessage());
         }
