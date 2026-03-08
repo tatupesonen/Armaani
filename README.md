@@ -4,6 +4,9 @@ armaani *(Finnish for _"my dear"_)* is a web-based game server manager for Arma 
 
 Built with Laravel 12, Inertia v2, React 19, Tailwind CSS v4, and with a bunch of help from Claude.
 
+## Inspired by
+[fugasjunior/arma-server-manager](https://github.com/fugasjunior/arma-server-manager)
+
 ## Screenshots
 
 ![Dashboard](docs/dashboard.png)
