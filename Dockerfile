@@ -3,8 +3,6 @@
 # =============================================================================
 FROM cm2network/steamcmd AS base
 
-# SteamCMD is installed at /home/steam/steamcmd/ by the steam user.
-# Switch to root for system package installs and running the application.
 USER root
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -123,6 +121,10 @@ RUN chmod +x /entrypoint.sh
 # Remove files not needed at runtime
 RUN rm -rf node_modules tests .github docs docker \
     arma-server-manager .env .env.example .git
+
+# Take ownership of SteamCMD directories for root
+RUN chown -R root:root /home/steam \
+    && chmod -R 755 /home/steam
 
 EXPOSE 80 443
 
