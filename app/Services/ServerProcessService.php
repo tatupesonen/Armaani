@@ -7,6 +7,14 @@ use App\GameManager;
 use App\Models\Server;
 use Illuminate\Support\Facades\Log;
 
+if (! defined('SIGTERM')) {
+    define('SIGTERM', 15);
+}
+
+if (! defined('SIGKILL')) {
+    define('SIGKILL', 9);
+}
+
 class ServerProcessService
 {
     public function __construct(
