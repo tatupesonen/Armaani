@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.2](https://github.com/tatupesonen/Armaani/compare/v0.3.1...v0.3.2) (2026-03-08)
+
+
+### Bug Fixes
+
+* remove dangling symlinks in copyBiKeys before creating new ones ([ef8c4ee](https://github.com/tatupesonen/Armaani/commit/ef8c4ee13af5f7533518c1dfc2c5f1adc6d7c41f))
+
 ## [0.3.1](https://github.com/tatupesonen/Armaani/compare/v0.3.0...v0.3.1) (2026-03-08)
 
 
