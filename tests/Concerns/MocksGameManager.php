@@ -19,6 +19,9 @@ trait MocksGameManager
         $handler->shouldReceive('getBootDetectionStrings')->andReturn(
             $gameType === GameType::Arma3 ? ['Connected to Steam servers'] : []
         );
+        $handler->shouldReceive('getCrashDetectionStrings')->andReturn([]);
+        $handler->shouldReceive('getModDownloadStartedString')->andReturnNull();
+        $handler->shouldReceive('getModDownloadFinishedString')->andReturnNull();
         $handler->shouldReceive('getServerLogPath')->andReturn('/tmp/fake.log');
         $handler->shouldReceive('getBinaryPath')->andReturn('/tmp/fake_binary');
         $handler->shouldReceive('getProfileName')->andReturn('arma3_1');

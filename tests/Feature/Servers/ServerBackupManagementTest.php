@@ -258,7 +258,7 @@ class ServerBackupManagementTest extends TestCase
     {
         $this->createVarsFileForServer($this->server, "version=148;\nauto=1;\n");
 
-        $mockService = \Mockery::mock(\App\Services\ServerProcessService::class, [app(\App\GameManager::class)])->makePartial();
+        $mockService = \Mockery::mock(\App\Services\ServerProcessService::class, [app(\App\GameManager::class), app(\App\Services\ServerBackupService::class)])->makePartial();
         $mockService->shouldAllowMockingProtectedMethods();
         $mockService->shouldReceive('spawnProcess')->once()->andReturn(12345);
         $mockService->shouldReceive('startLogTail')->once();
@@ -278,7 +278,7 @@ class ServerBackupManagementTest extends TestCase
 
     protected function createVarsFileForServer(Server $server, string $content): string
     {
-        $service = new ServerBackupService;
+        $service = app(ServerBackupService::class);
         $varsPath = $service->getVarsFilePath($server);
         $varsDir = dirname($varsPath);
 

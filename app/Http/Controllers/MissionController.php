@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\Mission\StoreMissionRequest;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -107,7 +108,7 @@ class MissionController extends Controller
             ->map(fn (string $file) => [
                 'name' => basename($file),
                 'size' => filesize($file),
-                'modified_at' => date('Y-m-d H:i:s', filemtime($file)),
+                'modified_at' => Carbon::createFromTimestamp(filemtime($file))->toDateTimeString(),
             ])
             ->sortByDesc('modified_at')
             ->values()

@@ -15,14 +15,18 @@ use Illuminate\Support\Facades\Log;
 
 class DetectServerEvents
 {
+    public function __construct(
+        private GameManager $gameManager,
+    ) {}
+
     /**
      * Handle the event.
      *
      * Detects game-specific log strings to transition server status:
-     * - Boot detection string: Booting/DownloadingMods → Running
-     * - Mod download started string: Booting → DownloadingMods
-     * - Mod download finished string: DownloadingMods → Booting
-     * - Crash detection string: Running/Booting/DownloadingMods → Crashed (with optional auto-restart)
+     * - Mod download started: Booting → DownloadingMods
+     * - Mod download finished: DownloadingMods → Booting
+     * - Boot detection: Booting/DownloadingMods → Running
+     * - Crash detection: Running/Booting/DownloadingMods → Crashed (with optional auto-restart)
      */
     public function handle(ServerLogOutput $event): void
     {
@@ -32,21 +36,12 @@ class DetectServerEvents
             return;
         }
 
-        $handler = app(GameManager::class)->for($server);
+        $handler = $this->gameManager->for($server);
 
         // Check for mod download started (Booting → DownloadingMods)
         $modDownloadStarted = $handler->getModDownloadStartedString();
         if ($modDownloadStarted !== null && str_contains($event->line, $modDownloadStarted)) {
-            $updated = Server::query()
-                ->where('id', $event->serverId)
-                ->where('status', ServerStatus::Booting)
-                ->update(['status' => ServerStatus::DownloadingMods]);
-
-            if ($updated) {
-                $serverName = Server::query()->where('id', $event->serverId)->value('name') ?? 'Server';
-                Log::info("[Server:{$event->serverId}] Mod download started — status changed from Booting to DownloadingMods");
-                ServerStatusChanged::dispatch($event->serverId, ServerStatus::DownloadingMods->value, $serverName);
-            }
+            $this->transitionStatus($server, ServerStatus::Booting, ServerStatus::DownloadingMods);
 
             return;
         }
@@ -54,16 +49,7 @@ class DetectServerEvents
         // Check for mod download finished (DownloadingMods → Booting)
         $modDownloadFinished = $handler->getModDownloadFinishedString();
         if ($modDownloadFinished !== null && str_contains($event->line, $modDownloadFinished)) {
-            $updated = Server::query()
-                ->where('id', $event->serverId)
-                ->where('status', ServerStatus::DownloadingMods)
-                ->update(['status' => ServerStatus::Booting]);
-
-            if ($updated) {
-                $serverName = Server::query()->where('id', $event->serverId)->value('name') ?? 'Server';
-                Log::info("[Server:{$event->serverId}] Mod download finished — status changed from DownloadingMods to Booting");
-                ServerStatusChanged::dispatch($event->serverId, ServerStatus::Booting->value, $serverName);
-            }
+            $this->transitionStatus($server, ServerStatus::DownloadingMods, ServerStatus::Booting);
 
             return;
         }
@@ -71,16 +57,7 @@ class DetectServerEvents
         // Check for boot detection (Booting/DownloadingMods → Running)
         $bootStrings = $handler->getBootDetectionStrings();
         if ($bootStrings !== [] && $this->lineContainsAny($event->line, $bootStrings)) {
-            $updated = Server::query()
-                ->where('id', $event->serverId)
-                ->whereIn('status', [ServerStatus::Booting, ServerStatus::DownloadingMods])
-                ->update(['status' => ServerStatus::Running]);
-
-            if ($updated) {
-                $serverName = Server::query()->where('id', $event->serverId)->value('name') ?? 'Server';
-                Log::info("[Server:{$event->serverId}] Boot detected — status changed to Running");
-                ServerStatusChanged::dispatch($event->serverId, ServerStatus::Running->value, $serverName);
-            }
+            $this->transitionStatus($server, [ServerStatus::Booting, ServerStatus::DownloadingMods], ServerStatus::Running);
 
             return;
         }
@@ -88,24 +65,20 @@ class DetectServerEvents
         // Check for crash detection (Running/Booting/DownloadingMods → Crashed)
         $crashStrings = $handler->getCrashDetectionStrings();
         if ($crashStrings !== [] && $this->lineContainsAny($event->line, $crashStrings)) {
-            $updated = Server::query()
-                ->where('id', $event->serverId)
-                ->whereIn('status', [ServerStatus::Running, ServerStatus::Booting, ServerStatus::DownloadingMods])
-                ->update(['status' => ServerStatus::Crashed]);
+            $transitioned = $this->transitionStatus(
+                $server,
+                [ServerStatus::Running, ServerStatus::Booting, ServerStatus::DownloadingMods],
+                ServerStatus::Crashed,
+            );
 
-            if ($updated) {
-                $server = $server->fresh();
-                $serverName = $server->name ?? 'Server';
-                Log::warning("[Server:{$event->serverId}] Crash detected — status changed to Crashed");
-                ServerStatusChanged::dispatch($event->serverId, ServerStatus::Crashed->value, $serverName);
-
+            if ($transitioned) {
                 SendDiscordWebhookJob::dispatch(
-                    "**{$serverName}** has crashed.\n> {$event->line}",
+                    "**{$server->name}** has crashed.\n> {$event->line}",
                     'Armaani',
                 );
 
                 if ($server->auto_restart) {
-                    Log::info("[Server:{$event->serverId}] Auto-restart enabled — queuing restart");
+                    Log::info("[Server:{$server->id}] Auto-restart enabled — queuing restart");
                     Bus::chain([
                         new StopServerJob($server),
                         new StartServerJob($server),
@@ -113,6 +86,32 @@ class DetectServerEvents
                 }
             }
         }
+    }
+
+    /**
+     * Attempt to transition a server's status atomically.
+     * Logs and broadcasts the change if the transition succeeds.
+     *
+     * @param  ServerStatus|array<int, ServerStatus>  $fromStatuses
+     */
+    private function transitionStatus(Server $server, ServerStatus|array $fromStatuses, ServerStatus $toStatus): bool
+    {
+        $query = Server::query()->where('id', $server->id);
+
+        if (is_array($fromStatuses)) {
+            $query->whereIn('status', $fromStatuses);
+        } else {
+            $query->where('status', $fromStatuses);
+        }
+
+        if (! $query->update(['status' => $toStatus])) {
+            return false;
+        }
+
+        Log::info("[Server:{$server->id}] Status changed to {$toStatus->value}");
+        ServerStatusChanged::dispatch($server->id, $toStatus->value, $server->name);
+
+        return true;
     }
 
     /**

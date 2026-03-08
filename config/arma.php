@@ -88,4 +88,15 @@ return [
 
     'max_backups_per_server' => (int) env('MAX_BACKUPS_PER_SERVER', 20),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Home Path
+    |--------------------------------------------------------------------------
+    |
+    | The HOME directory used by SteamCMD for storing its configuration.
+    |
+    */
+
+    'home_path' => env('HOME', '/root'),
+
 ];

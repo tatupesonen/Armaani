@@ -1,11 +1,11 @@
 import { usePage } from '@inertiajs/react';
 import {
+    AlertTriangle,
     CheckCircle,
     Info,
     Loader2,
     X,
     XCircle,
-    AlertTriangle,
 } from 'lucide-react';
 import {
     createContext,
@@ -17,6 +17,8 @@ import {
 } from 'react';
 import type { ReactNode } from 'react';
 import echo from '@/echo';
+import { serverStatusLabel } from '@/lib/utils';
+import type { ServerStatus } from '@/types/game';
 
 type ToastVariant = 'success' | 'error' | 'info' | 'warning';
 
@@ -92,6 +94,8 @@ const statusGradients: Record<string, string> = {
         'from-emerald-400/20 to-zinc-300/5 dark:from-emerald-500/15 dark:to-zinc-600/5',
     stopping:
         'from-red-400/20 to-zinc-300/5 dark:from-red-500/15 dark:to-zinc-600/5',
+    crashed:
+        'from-red-500/25 to-zinc-300/5 dark:from-red-600/20 dark:to-zinc-600/5',
 };
 
 const statusSpinnerColors: Record<string, string> = {
@@ -107,6 +111,7 @@ const statusTextColors: Record<string, string> = {
     downloading_mods: 'text-purple-800 dark:text-purple-200',
     running: 'text-emerald-800 dark:text-emerald-200',
     stopping: 'text-red-800 dark:text-red-200',
+    crashed: 'text-red-800 dark:text-red-200',
 };
 
 const statusSubTextColors: Record<string, string> = {
@@ -115,13 +120,8 @@ const statusSubTextColors: Record<string, string> = {
     downloading_mods: 'text-purple-600 dark:text-purple-400',
     running: 'text-emerald-600 dark:text-emerald-400',
     stopping: 'text-red-600 dark:text-red-400',
+    crashed: 'text-red-600 dark:text-red-400',
 };
-
-function statusLabel(status: string): string {
-    if (status === 'running') return 'Running';
-    if (status === 'downloading_mods') return 'Downloading Mods...';
-    return status.charAt(0).toUpperCase() + status.slice(1) + '...';
-}
 
 export function ToastProvider({ children }: { children: ReactNode }) {
     const [toasts, setToasts] = useState<Toast[]>([]);
@@ -369,12 +369,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                         )}
 
                         <div className="relative flex items-center gap-3 bg-white/80 px-4 py-3 dark:bg-zinc-800/80">
-                            {st.status !== 'running' ? (
+                            {st.status === 'running' ? (
+                                <CheckCircle className="size-5 shrink-0 text-emerald-500" />
+                            ) : st.status === 'crashed' ? (
+                                <XCircle className="size-5 shrink-0 text-red-500" />
+                            ) : (
                                 <Loader2
                                     className={`size-5 shrink-0 animate-spin transition-colors duration-700 ${statusSpinnerColors[st.status] ?? 'text-zinc-500'}`}
                                 />
-                            ) : (
-                                <CheckCircle className="size-5 shrink-0 text-emerald-500" />
                             )}
                             <div>
                                 <span
@@ -385,7 +387,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                                 <span
                                     className={`ml-1 text-xs transition-colors duration-700 ${statusSubTextColors[st.status] ?? ''}`}
                                 >
-                                    {statusLabel(st.status)}
+                                    {serverStatusLabel(
+                                        st.status as ServerStatus,
+                                    )}
                                 </span>
                             </div>
                         </div>

@@ -2,7 +2,7 @@ import type { InertiaLinkProps } from '@inertiajs/react';
 import { clsx } from 'clsx';
 import type { ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import type { InstallationStatus, ServerStatus } from '@/types/game';
+import type { GameType, InstallationStatus, ServerStatus } from '@/types/game';
 
 export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
@@ -23,14 +23,28 @@ export function formatBytes(bytes: number | null | undefined): string {
     return `${(bytes / Math.pow(1024, i)).toFixed(i > 0 ? 1 : 0)} ${units[i]}`;
 }
 
-export function gameTypeLabel(gameType: string): string {
-    const labels: Record<string, string> = {
+export function gameTypeLabel(gameType: GameType): string {
+    const labels: Record<GameType, string> = {
         arma3: 'Arma 3',
         reforger: 'Arma Reforger',
         dayz: 'DayZ',
     };
 
-    return labels[gameType] ?? gameType;
+    return labels[gameType];
+}
+
+export function serverStatusLabel(status: ServerStatus): string {
+    const labels: Record<ServerStatus, string> = {
+        stopped: 'Stopped',
+        starting: 'Starting...',
+        booting: 'Booting...',
+        downloading_mods: 'Downloading Mods...',
+        running: 'Running',
+        stopping: 'Stopping...',
+        crashed: 'Crashed',
+    };
+
+    return labels[status];
 }
 
 export function serverStatusVariant(
@@ -49,7 +63,7 @@ export function serverStatusVariant(
         crashed: 'danger',
     };
 
-    return map[status] ?? 'secondary';
+    return map[status];
 }
 
 export function installStatusVariant(
@@ -65,7 +79,7 @@ export function installStatusVariant(
         failed: 'danger',
     };
 
-    return map[status] ?? 'secondary';
+    return map[status];
 }
 
 export function usageBarColor(percent: number): string {

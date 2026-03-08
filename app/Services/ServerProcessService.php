@@ -11,6 +11,7 @@ class ServerProcessService
 {
     public function __construct(
         protected GameManager $gameManager,
+        protected ServerBackupService $backupService,
     ) {}
 
     /**
@@ -35,7 +36,7 @@ class ServerProcessService
 
         // Auto-backup profile data before overwriting configs (only for games that support it)
         if ($handler->getBackupFilePath($server)) {
-            app(ServerBackupService::class)->createFromServer($server, 'Auto-backup before start', isAutomatic: true);
+            $this->backupService->createFromServer($server, 'Auto-backup before start', isAutomatic: true);
         }
 
         $server->load('activePreset.mods');

@@ -489,7 +489,7 @@ class ServerProcessServiceTest extends TestCase
         $server = $this->makeServer();
 
         // Use a partial mock to prevent real proc_open / exec calls
-        $mockService = Mockery::mock(ServerProcessService::class, [app(\App\GameManager::class)])->makePartial();
+        $mockService = Mockery::mock(ServerProcessService::class, [app(\App\GameManager::class), app(\App\Services\ServerBackupService::class)])->makePartial();
         $mockService->shouldAllowMockingProtectedMethods();
         $mockService->shouldReceive('spawnProcess')->once()->andReturn(12345);
         $mockService->shouldReceive('startLogTail')->once();

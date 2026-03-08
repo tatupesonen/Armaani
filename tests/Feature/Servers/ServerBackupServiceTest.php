@@ -26,7 +26,7 @@ class ServerBackupServiceTest extends TestCase
         $this->testBasePath = sys_get_temp_dir().'/armaani_test_servers_'.uniqid();
         config(['arma.servers_base_path' => $this->testBasePath]);
 
-        $this->service = new ServerBackupService;
+        $this->service = app(ServerBackupService::class);
         $this->server = Server::factory()->create();
     }
 

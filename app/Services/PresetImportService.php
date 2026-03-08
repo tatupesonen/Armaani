@@ -14,6 +14,10 @@ use InvalidArgumentException;
 
 class PresetImportService
 {
+    public function __construct(
+        private SteamWorkshopService $steamWorkshopService,
+    ) {}
+
     /**
      * Parse an Arma 3 Launcher HTML preset file and return workshop mod IDs.
      *
@@ -116,7 +120,7 @@ class PresetImportService
      */
     protected function fetchBulkMetadata(array $workshopIds): array
     {
-        return app(SteamWorkshopService::class)->getMultipleModDetails($workshopIds);
+        return $this->steamWorkshopService->getMultipleModDetails($workshopIds);
     }
 
     /**

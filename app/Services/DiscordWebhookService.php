@@ -67,12 +67,6 @@ class DiscordWebhookService
 
     protected function getWebhookUrl(): ?string
     {
-        $settings = AppSetting::query()->first();
-
-        if ($settings === null || empty($settings->discord_webhook_url)) {
-            return null;
-        }
-
-        return $settings->discord_webhook_url;
+        return AppSetting::query()->first()?->discord_webhook_url ?: null;
     }
 }

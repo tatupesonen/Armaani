@@ -111,7 +111,7 @@ class SteamCmdService
         ]);
 
         $result = Process::timeout(60)
-            ->env(['HOME' => env('HOME', '/root')])
+            ->env(['HOME' => config('arma.home_path')])
             ->run([
                 $this->steamcmdPath,
                 '+login', $username, $password,
@@ -129,11 +129,7 @@ class SteamCmdService
 
         $output = $stdout.' '.$stderr;
 
-        if (preg_match('/Logging in user .+\.\.\.(OK|Logged in OK)/i', $output)) {
-            return true;
-        }
-
-        return false;
+        return (bool) preg_match('/Logging in user .+\.\.\.(OK|Logged in OK)/i', $output);
     }
 
     /**

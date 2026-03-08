@@ -28,17 +28,20 @@ use Inertia\Response;
 
 class ServerController extends Controller
 {
+    public function __construct(
+        private GameManager $gameManager,
+    ) {}
+
     public function index(): Response
     {
-        $gameManager = app(GameManager::class);
 
         $servers = Server::query()
             ->with(['activePreset', 'gameInstall', 'difficultySettings', 'networkSettings', 'reforgerSettings', 'dayzSettings', 'backups'])
             ->orderBy('name')
             ->get()
-            ->each(function (Server $server) use ($gameManager): void {
+            ->each(function (Server $server): void {
                 $server->makeVisible(['password', 'admin_password']);
-                $server->setAttribute('supports_backups', $gameManager->for($server)->getBackupFilePath($server) !== null);
+                $server->setAttribute('supports_backups', $this->gameManager->for($server)->getBackupFilePath($server) !== null);
                 $server->setAttribute('profiles_path', $server->getProfilesPath());
             });
 
@@ -213,7 +216,7 @@ class ServerController extends Controller
 
     public function launchCommand(Server $server): JsonResponse
     {
-        $handler = app(GameManager::class)->for($server);
+        $handler = $this->gameManager->for($server);
 
         return response()->json([
             'command' => implode(' ', $handler->buildLaunchCommand($server)),
@@ -222,7 +225,7 @@ class ServerController extends Controller
 
     public function serverLog(Server $server): JsonResponse
     {
-        $handler = app(GameManager::class)->for($server);
+        $handler = $this->gameManager->for($server);
         $logPath = $handler->getServerLogPath($server);
 
         if (! $logPath || ! file_exists($logPath)) {

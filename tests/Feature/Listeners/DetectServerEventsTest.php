@@ -34,7 +34,7 @@ class DetectServerEventsTest extends TestCase
 
         $server = Server::factory()->create(['name' => 'Boot Test', 'status' => ServerStatus::Booting]);
 
-        $listener = new DetectServerEvents;
+        $listener = app(DetectServerEvents::class);
         $listener->handle(new ServerLogOutput($server->id, '15:42:30 Connected to Steam servers'));
 
         $this->assertEquals(ServerStatus::Running, $server->fresh()->status);
@@ -50,7 +50,7 @@ class DetectServerEventsTest extends TestCase
     {
         $server = Server::factory()->create(['status' => ServerStatus::Booting]);
 
-        $listener = new DetectServerEvents;
+        $listener = app(DetectServerEvents::class);
         $listener->handle(new ServerLogOutput($server->id, '15:42:30 BattlEye Server: Initialized'));
 
         $this->assertEquals(ServerStatus::Booting, $server->fresh()->status);
@@ -62,7 +62,7 @@ class DetectServerEventsTest extends TestCase
 
         $server = Server::factory()->create(['status' => ServerStatus::Running]);
 
-        $listener = new DetectServerEvents;
+        $listener = app(DetectServerEvents::class);
         $listener->handle(new ServerLogOutput($server->id, '15:42:30 Connected to Steam servers'));
 
         $this->assertEquals(ServerStatus::Running, $server->fresh()->status);
@@ -74,7 +74,7 @@ class DetectServerEventsTest extends TestCase
     {
         $server = Server::factory()->create(['status' => ServerStatus::Stopped]);
 
-        $listener = new DetectServerEvents;
+        $listener = app(DetectServerEvents::class);
         $listener->handle(new ServerLogOutput($server->id, '15:42:30 Connected to Steam servers'));
 
         $this->assertEquals(ServerStatus::Stopped, $server->fresh()->status);
@@ -90,7 +90,7 @@ class DetectServerEventsTest extends TestCase
             'status' => ServerStatus::Booting,
         ]);
 
-        $listener = new DetectServerEvents;
+        $listener = app(DetectServerEvents::class);
         $listener->handle(new ServerLogOutput($server->id, 'Addon Download started'));
 
         $this->assertEquals(ServerStatus::DownloadingMods, $server->fresh()->status);
@@ -112,7 +112,7 @@ class DetectServerEventsTest extends TestCase
             'status' => ServerStatus::DownloadingMods,
         ]);
 
-        $listener = new DetectServerEvents;
+        $listener = app(DetectServerEvents::class);
         $listener->handle(new ServerLogOutput($server->id, 'Required addons are ready to use.'));
 
         $this->assertEquals(ServerStatus::Booting, $server->fresh()->status);
@@ -134,7 +134,7 @@ class DetectServerEventsTest extends TestCase
             'status' => ServerStatus::DownloadingMods,
         ]);
 
-        $listener = new DetectServerEvents;
+        $listener = app(DetectServerEvents::class);
         $listener->handle(new ServerLogOutput($server->id, 'Server registered with addr 1.2.3.4:2001'));
 
         $this->assertEquals(ServerStatus::Running, $server->fresh()->status);
@@ -154,7 +154,7 @@ class DetectServerEventsTest extends TestCase
             'status' => ServerStatus::Booting,
         ]);
 
-        $listener = new DetectServerEvents;
+        $listener = app(DetectServerEvents::class);
         $listener->handle(new ServerLogOutput($server->id, 'Addon Download started'));
 
         $this->assertEquals(ServerStatus::Booting, $server->fresh()->status);
@@ -175,7 +175,7 @@ class DetectServerEventsTest extends TestCase
             'status' => ServerStatus::Running,
         ]);
 
-        $listener = new DetectServerEvents;
+        $listener = app(DetectServerEvents::class);
         $listener->handle(new ServerLogOutput($server->id, 'Segmentation fault (core dumped)'));
 
         $this->assertEquals(ServerStatus::Crashed, $server->fresh()->status);
@@ -198,7 +198,7 @@ class DetectServerEventsTest extends TestCase
             'status' => ServerStatus::Running,
         ]);
 
-        $listener = new DetectServerEvents;
+        $listener = app(DetectServerEvents::class);
         $listener->handle(new ServerLogOutput($server->id, 'Segmentation fault (core dumped)'));
 
         Bus::assertDispatched(SendDiscordWebhookJob::class, function (SendDiscordWebhookJob $job) {
@@ -219,7 +219,7 @@ class DetectServerEventsTest extends TestCase
             'auto_restart' => true,
         ]);
 
-        $listener = new DetectServerEvents;
+        $listener = app(DetectServerEvents::class);
         $listener->handle(new ServerLogOutput($server->id, 'Segmentation fault (core dumped)'));
 
         $this->assertEquals(ServerStatus::Crashed, $server->fresh()->status);
@@ -241,7 +241,7 @@ class DetectServerEventsTest extends TestCase
             'auto_restart' => false,
         ]);
 
-        $listener = new DetectServerEvents;
+        $listener = app(DetectServerEvents::class);
         $listener->handle(new ServerLogOutput($server->id, 'Segmentation fault (core dumped)'));
 
         $this->assertEquals(ServerStatus::Crashed, $server->fresh()->status);
@@ -260,7 +260,7 @@ class DetectServerEventsTest extends TestCase
             'status' => ServerStatus::Booting,
         ]);
 
-        $listener = new DetectServerEvents;
+        $listener = app(DetectServerEvents::class);
         $listener->handle(new ServerLogOutput($server->id, 'Segmentation fault (core dumped)'));
 
         $this->assertEquals(ServerStatus::Crashed, $server->fresh()->status);
@@ -275,7 +275,7 @@ class DetectServerEventsTest extends TestCase
             'status' => ServerStatus::Stopped,
         ]);
 
-        $listener = new DetectServerEvents;
+        $listener = app(DetectServerEvents::class);
         $listener->handle(new ServerLogOutput($server->id, 'Segmentation fault (core dumped)'));
 
         $this->assertEquals(ServerStatus::Stopped, $server->fresh()->status);
@@ -293,7 +293,7 @@ class DetectServerEventsTest extends TestCase
             'status' => ServerStatus::Crashed,
         ]);
 
-        $listener = new DetectServerEvents;
+        $listener = app(DetectServerEvents::class);
         $listener->handle(new ServerLogOutput($server->id, 'Segmentation fault (core dumped)'));
 
         $this->assertEquals(ServerStatus::Crashed, $server->fresh()->status);
@@ -310,7 +310,7 @@ class DetectServerEventsTest extends TestCase
             'status' => ServerStatus::Running,
         ]);
 
-        $listener = new DetectServerEvents;
+        $listener = app(DetectServerEvents::class);
         $listener->handle(new ServerLogOutput($server->id, 'Segmentation fault (core dumped)'));
 
         $this->assertEquals(ServerStatus::Running, $server->fresh()->status);

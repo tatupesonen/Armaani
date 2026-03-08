@@ -16,7 +16,11 @@ import HeadlessClientControls from '@/components/servers/headless-client-control
 import ServerEditPanel from '@/components/servers/server-edit-panel';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { gameTypeLabel, serverStatusVariant } from '@/lib/utils';
+import {
+    gameTypeLabel,
+    serverStatusLabel,
+    serverStatusVariant,
+} from '@/lib/utils';
 import {
     start,
     stop,
@@ -79,12 +83,6 @@ export default function ServerCard({
     const [commandText, setCommandText] = useState<string | null>(null);
     const [editing, setEditing] = useState(false);
 
-    const isTransitioning = [
-        'starting',
-        'stopping',
-        'booting',
-        'downloading_mods',
-    ].includes(server.status);
     const supportsHC =
         server.game_type === 'arma3' && server.status === 'running';
 
@@ -127,7 +125,7 @@ export default function ServerCard({
                             {gameTypeLabel(server.game_type)}
                         </Badge>
                         <Badge variant={serverStatusVariant(server.status)}>
-                            {server.status}
+                            {serverStatusLabel(server.status)}
                         </Badge>
                     </div>
                     <p className="mt-1 text-sm text-muted-foreground">
@@ -156,17 +154,38 @@ export default function ServerCard({
                 </div>
 
                 <div className="relative flex items-center gap-2">
-                    {isTransitioning ? (
+                    {server.status === 'starting' ||
+                    server.status === 'stopping' ? (
                         <Button size="sm" disabled>
                             <Loader2 className="mr-2 size-4 animate-spin" />
-                            {server.status === 'starting'
-                                ? 'Starting...'
-                                : server.status === 'booting'
-                                  ? 'Booting...'
-                                  : server.status === 'downloading_mods'
-                                    ? 'Downloading Mods...'
-                                    : 'Stopping...'}
+                            {serverStatusLabel(server.status)}
                         </Button>
+                    ) : server.status === 'booting' ||
+                      server.status === 'downloading_mods' ? (
+                        <>
+                            <Button size="sm" disabled>
+                                <Loader2 className="mr-2 size-4 animate-spin" />
+                                {serverStatusLabel(server.status)}
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => router.post(stop.url(server.id))}
+                            >
+                                <Pause className="mr-2 size-4" />
+                                Stop
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                    router.post(restart.url(server.id))
+                                }
+                            >
+                                <RefreshCw className="mr-2 size-4" />
+                                Restart
+                            </Button>
+                        </>
                     ) : server.status === 'running' ? (
                         <>
                             <Button
@@ -196,30 +215,6 @@ export default function ServerCard({
                             <Play className="mr-2 size-4" />
                             Start
                         </Button>
-                    )}
-
-                    {(server.status === 'booting' ||
-                        server.status === 'downloading_mods') && (
-                        <>
-                            <Button
-                                size="sm"
-                                variant="destructive"
-                                onClick={() => router.post(stop.url(server.id))}
-                            >
-                                <Pause className="mr-2 size-4" />
-                                Stop
-                            </Button>
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() =>
-                                    router.post(restart.url(server.id))
-                                }
-                            >
-                                <RefreshCw className="mr-2 size-4" />
-                                Restart
-                            </Button>
-                        </>
                     )}
 
                     <Button

@@ -9,13 +9,17 @@ use Illuminate\Support\Facades\Log;
 
 class ServerBackupService
 {
+    public function __construct(
+        private GameManager $gameManager,
+    ) {}
+
     /**
      * Get the path to the profile backup file for a server.
      * Returns null if this game type has no profile backup concept.
      */
     public function getVarsFilePath(Server $server): ?string
     {
-        return app(GameManager::class)->for($server)->getBackupFilePath($server);
+        return $this->gameManager->for($server)->getBackupFilePath($server);
     }
 
     /**
