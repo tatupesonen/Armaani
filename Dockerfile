@@ -93,6 +93,16 @@ RUN npm ci \
     && rm -rf node_modules .env
 
 # =============================================================================
+# Stage 2b: Test (extends build — keeps dev deps + tests for CI)
+# =============================================================================
+FROM build AS test
+
+# Re-install with dev dependencies for testing
+RUN composer install --optimize-autoloader
+
+CMD ["php", "artisan", "test", "--compact"]
+
+# =============================================================================
 # Stage 3: Final runtime (base + built app, no Node)
 # =============================================================================
 FROM base
