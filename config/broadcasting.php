@@ -32,9 +32,9 @@ return [
 
         'reverb' => [
             'driver' => 'reverb',
-            'key' => env('REVERB_APP_KEY', 'armaman-key'),
-            'secret' => env('REVERB_APP_SECRET', 'armaman-secret'),
-            'app_id' => env('REVERB_APP_ID', 'armaman'),
+            'key' => env('REVERB_APP_KEY', 'armaani-key'),
+            'secret' => env('REVERB_APP_SECRET', 'armaani-secret'),
+            'app_id' => env('REVERB_APP_ID', 'armaani'),
             'options' => [
                 'host' => env('REVERB_HOST', 'localhost'),
                 'port' => env('REVERB_PORT', 6001),

@@ -1,9 +1,9 @@
-# Implementation Plan: armaman -> armaman2 Feature Parity
+# Implementation Plan: armaani -> armaani2 Feature Parity
 
 ## Architecture Difference
 
-- **armaman** (original): Laravel 12 + Livewire SFC + Blade + Alpine.js + Tailwind CSS
-- **armaman2** (port): Laravel 12 + Inertia v2 + React 19 + Tailwind CSS v4
+- **armaani** (original): Laravel 12 + Livewire SFC + Blade + Alpine.js + Tailwind CSS
+- **armaani2** (port): Laravel 12 + Inertia v2 + React 19 + Tailwind CSS v4
 
 ## What Is Already Identical
 
@@ -22,7 +22,7 @@ All backend logic was copied directly and is identical between both projects:
 - All 12 factories
 - DatabaseSeeder
 
-### Intentional Improvements in armaman2
+### Intentional Improvements in armaani2
 
 - All 4 Events changed from `Channel` (public) to `PrivateChannel` (auth-required)
 - Proper Inertia controllers instead of Livewire SFCs
@@ -272,7 +272,7 @@ $this->post('/servers', $data)
 
 ## Decisions Made
 
-- **Private channels**: Keep armaman2's PrivateChannel approach. Use `Echo.private()` in React.
+- **Private channels**: Keep armaani2's PrivateChannel approach. Use `Echo.private()` in React.
 - **Toast system**: Full port with server status toasts + flash message toasts.
 - **Audit logging**: Skip. Current `Log::info()` is sufficient.
 - **UI features**: Port everything for full parity.
@@ -290,7 +290,7 @@ $this->post('/servers', $data)
 
 ## Modified Files
 
-### Backend (modified in armaman2)
+### Backend (modified in armaani2)
 
 - `app/Http/Controllers/ServerController.php` — status pre-set, broadcast helper
 - `app/Http/Controllers/ServerBackupController.php` — backup name, upload fix
@@ -305,7 +305,7 @@ $this->post('/servers', $data)
 - `app/GameHandlers/Arma3Handler.php` — added network settings validation rules
 - `app/Services/SteamCmdService.php` — added `stripAnsi()` for ANSI code stripping
 
-### Frontend (modified/created in armaman2)
+### Frontend (modified/created in armaani2)
 
 - `resources/js/components/toast-manager.tsx` — NEW: full toast system
 - `resources/js/layouts/app/app-sidebar-layout.tsx` — ToastProvider wrapper
@@ -317,7 +317,7 @@ $this->post('/servers', $data)
 - `resources/js/app.tsx` — removed StrictMode (duplicate log line fix)
 - `resources/css/app.css` — dark mode brightness adjustments
 
-### Tests (created in armaman2)
+### Tests (created in armaani2)
 
 - `tests/Concerns/` — 4 trait files (CreatesGameScenarios, MocksGameManager, MocksServerProcessService, MocksSteamCmdProcess)
 - `tests/Feature/Events/BroadcastEventsTest.php` — 8 tests

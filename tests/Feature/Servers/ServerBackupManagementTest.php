@@ -26,7 +26,7 @@ class ServerBackupManagementTest extends TestCase
     {
         parent::setUp();
 
-        $this->testBasePath = sys_get_temp_dir().'/armaman_test_backups_'.uniqid();
+        $this->testBasePath = sys_get_temp_dir().'/armaani_test_backups_'.uniqid();
         config(['arma.servers_base_path' => $this->testBasePath]);
 
         $this->user = User::factory()->create();

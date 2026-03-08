@@ -37,10 +37,10 @@ class ServerProcessServiceTest extends TestCase
     {
         parent::setUp();
 
-        $this->testServersBasePath = sys_get_temp_dir().'/armaman_test_servers_'.uniqid();
-        $this->testGamesBasePath = sys_get_temp_dir().'/armaman_test_games_'.uniqid();
-        $this->testModsBasePath = sys_get_temp_dir().'/armaman_test_mods_'.uniqid();
-        $this->testStoragePath = sys_get_temp_dir().'/armaman_test_storage_'.uniqid();
+        $this->testServersBasePath = sys_get_temp_dir().'/armaani_test_servers_'.uniqid();
+        $this->testGamesBasePath = sys_get_temp_dir().'/armaani_test_games_'.uniqid();
+        $this->testModsBasePath = sys_get_temp_dir().'/armaani_test_mods_'.uniqid();
+        $this->testStoragePath = sys_get_temp_dir().'/armaani_test_storage_'.uniqid();
 
         @mkdir($this->testStoragePath.'/app', 0755, true);
 
@@ -723,7 +723,7 @@ class ServerProcessServiceTest extends TestCase
 
     private function makeServer(array $attributes = []): Server
     {
-        $this->missionsPath = sys_get_temp_dir().'/armaman_test_missions_'.uniqid();
+        $this->missionsPath = sys_get_temp_dir().'/armaani_test_missions_'.uniqid();
 
         $gameInstall = GameInstall::factory()->installed()->create();
 

@@ -1,6 +1,5 @@
 import { Link } from '@inertiajs/react';
 import {
-    BookOpen,
     FolderGit2,
     HardDrive,
     LayoutGrid,
@@ -57,13 +56,8 @@ const navGroups: NavGroup[] = [
 const footerNavItems = [
     {
         title: 'Repository',
-        href: 'https://github.com/laravel/react-starter-kit',
+        href: 'https://github.com/tatupesonen/armaani',
         icon: FolderGit2,
-    },
-    {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits#react',
-        icon: BookOpen,
     },
 ];
 

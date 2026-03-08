@@ -29,7 +29,7 @@ class WorkshopModManagementTest extends TestCase
     {
         parent::setUp();
 
-        $this->testModsBasePath = sys_get_temp_dir().'/armaman_test_mods_'.uniqid();
+        $this->testModsBasePath = sys_get_temp_dir().'/armaani_test_mods_'.uniqid();
         config(['arma.mods_base_path' => $this->testModsBasePath]);
 
         $this->user = User::factory()->create();

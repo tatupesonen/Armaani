@@ -26,8 +26,8 @@ class ReforgerHandlerTest extends TestCase
     {
         parent::setUp();
 
-        $this->testServersBasePath = sys_get_temp_dir().'/armaman_test_servers_'.uniqid();
-        $this->testGamesBasePath = sys_get_temp_dir().'/armaman_test_games_'.uniqid();
+        $this->testServersBasePath = sys_get_temp_dir().'/armaani_test_servers_'.uniqid();
+        $this->testGamesBasePath = sys_get_temp_dir().'/armaani_test_games_'.uniqid();
 
         config([
             'arma.servers_base_path' => $this->testServersBasePath,

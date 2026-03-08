@@ -1,6 +1,6 @@
-# ArmaMan Porting Plan: Livewire → Inertia/React
+# armaani Porting Plan: Livewire → Inertia/React
 
-Porting the game server manager from `~/armaman` (Livewire 4 + Flux UI + Alpine.js) to `~/armaman2` (Inertia v2 + React 19 + shadcn/ui).
+Porting the game server manager from `~/armaani` (Livewire 4 + Flux UI + Alpine.js) to `~/armaani2` (Inertia v2 + React 19 + shadcn/ui).
 
 ## Decisions
 

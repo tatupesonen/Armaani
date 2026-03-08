@@ -297,13 +297,13 @@ Wayfinder generates TypeScript functions for Laravel routes. Import from `@/acti
 
 </laravel-boost-guidelines>
 
-# ArmaMan2 - Game Server Manager
+# armaani - Game Server Manager
 
 ## Project Overview
 
-ArmaMan2 is a web-based game server manager built with Laravel 12, Inertia v2, React 19, and Tailwind CSS v4. It supports Arma 3, Arma Reforger, and DayZ (scaffolded). It allows users to install, configure, and manage multiple server instances (including starting/stopping/restarting processes), download Steam Workshop mods via SteamCMD, organize mods into presets, import Arma 3 Launcher HTML preset files, and assign presets to server instances. Game-specific logic is handled by the GameHandler pattern (Manager pattern). The application supports dynamic headless client management (Arma 3), server difficulty settings, and profile backup/restore. It ships as a single Docker container with SteamCMD bundled inside.
+armaani is a web-based game server manager built with Laravel 12, Inertia v2, React 19, and Tailwind CSS v4. It supports Arma 3, Arma Reforger, and DayZ (scaffolded). It allows users to install, configure, and manage multiple server instances (including starting/stopping/restarting processes), download Steam Workshop mods via SteamCMD, organize mods into presets, import Arma 3 Launcher HTML preset files, and assign presets to server instances. Game-specific logic is handled by the GameHandler pattern (Manager pattern). The application supports dynamic headless client management (Arma 3), server difficulty settings, and profile backup/restore. It ships as a single Docker container with SteamCMD bundled inside.
 
-This project is a port of `~/armaman` (Laravel + Livewire) to Inertia v2 + React 19. All backend logic is identical. The frontend is completely rewritten in React.
+This project is a port of `~/armaani` (Laravel + Livewire) to Inertia v2 + React 19. All backend logic is identical. The frontend is completely rewritten in React.
 
 ## Architecture
 

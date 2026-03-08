@@ -22,7 +22,7 @@ class MissionManagementTest extends TestCase
         parent::setUp();
 
         $this->user = User::factory()->create();
-        $this->missionsPath = sys_get_temp_dir().'/armaman_test_missions_'.uniqid();
+        $this->missionsPath = sys_get_temp_dir().'/armaani_test_missions_'.uniqid();
         config(['arma.missions_base_path' => $this->missionsPath]);
     }
 

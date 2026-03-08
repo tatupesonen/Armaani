@@ -26,7 +26,7 @@ class InstallServerJobTest extends TestCase
     {
         parent::setUp();
 
-        $this->testGamesBasePath = sys_get_temp_dir().'/armaman_test_games_'.uniqid();
+        $this->testGamesBasePath = sys_get_temp_dir().'/armaani_test_games_'.uniqid();
 
         config(['arma.games_base_path' => $this->testGamesBasePath]);
 
