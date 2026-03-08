@@ -59,6 +59,11 @@ const statusGradients = [
         color: 'from-red-400/20 to-zinc-300/5 dark:from-red-500/15 dark:to-zinc-600/5',
         shimmer: 'motion-safe:animate-shimmer-fast',
     },
+    {
+        status: 'crashed',
+        color: 'from-red-500/25 to-zinc-300/5 dark:from-red-600/20 dark:to-zinc-600/5',
+        shimmer: null,
+    },
 ] as const;
 
 export default function ServerCard({
@@ -251,7 +256,10 @@ export default function ServerCard({
                         size="sm"
                         variant="destructive"
                         onClick={() => onDelete(server.id)}
-                        disabled={server.status !== 'stopped'}
+                        disabled={
+                            server.status !== 'stopped' &&
+                            server.status !== 'crashed'
+                        }
                     >
                         <Trash2 className="size-4" />
                     </Button>

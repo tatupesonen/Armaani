@@ -56,6 +56,7 @@ type EditData = {
     persistent: boolean;
     von_enabled: boolean;
     additional_server_options: string;
+    auto_restart: boolean;
     // difficulty
     reduced_damage: boolean;
     group_indicators: number;
@@ -83,7 +84,6 @@ type EditData = {
     // reforger
     scenario_id: string;
     third_person_view_enabled: boolean;
-    backend_log_enabled: boolean;
     max_fps: number;
     cross_platform: boolean;
     // network
@@ -122,10 +122,10 @@ function buildEditData(server: Server): EditData {
         persistent: server.persistent,
         von_enabled: server.von_enabled,
         additional_server_options: server.additional_server_options ?? '',
+        auto_restart: server.auto_restart ?? false,
         // reforger
         scenario_id: rfg?.scenario_id ?? '',
         third_person_view_enabled: rfg?.third_person_view_enabled ?? true,
-        backend_log_enabled: rfg?.backend_log_enabled ?? true,
         max_fps: rfg?.max_fps ?? 60,
         cross_platform: rfg?.cross_platform ?? false,
         // difficulty defaults
@@ -377,7 +377,7 @@ export default function ServerEditPanel({
                     />
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="grid grid-cols-1 items-center gap-4 md:grid-cols-3">
                     <div className="space-y-2">
                         <Label>Game Install</Label>
                         <Select
@@ -433,6 +433,13 @@ export default function ServerEditPanel({
                             </Select>
                         </div>
                     )}
+                    <div className="mt-3 flex items-center gap-2">
+                        <Switch
+                            checked={data.auto_restart}
+                            onCheckedChange={(v) => set('auto_restart', v)}
+                        />
+                        <Label>Auto-Restart on Crash</Label>
+                    </div>
                 </div>
 
                 {/* Arma 3 Server Rules */}
@@ -580,15 +587,6 @@ export default function ServerEditPanel({
                                         }
                                     />
                                     <Label>BattlEye Anti-Cheat</Label>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <Switch
-                                        checked={data.backend_log_enabled}
-                                        onCheckedChange={(v) =>
-                                            set('backend_log_enabled', v)
-                                        }
-                                    />
-                                    <Label>Backend Logging</Label>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <Switch

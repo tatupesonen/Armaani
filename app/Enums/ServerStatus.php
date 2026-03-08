@@ -10,4 +10,5 @@ enum ServerStatus: string
     case DownloadingMods = 'downloading_mods';
     case Running = 'running';
     case Stopping = 'stopping';
+    case Crashed = 'crashed';
 }

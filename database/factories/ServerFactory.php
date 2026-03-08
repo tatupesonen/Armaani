@@ -36,6 +36,7 @@ class ServerFactory extends Factory
             'persistent' => false,
             'von_enabled' => true,
             'additional_server_options' => null,
+            'auto_restart' => false,
         ];
     }
 

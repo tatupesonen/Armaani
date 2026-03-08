@@ -35,6 +35,7 @@ class Server extends Model
         'persistent',
         'von_enabled',
         'additional_server_options',
+        'auto_restart',
     ];
 
     protected $hidden = [
@@ -55,6 +56,7 @@ class Server extends Model
             'battle_eye' => 'boolean',
             'persistent' => 'boolean',
             'von_enabled' => 'boolean',
+            'auto_restart' => 'boolean',
         ];
     }
 

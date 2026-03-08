@@ -57,6 +57,12 @@ interface GameHandler
      */
     public function getModDownloadFinishedString(): ?string;
 
+    /**
+     * String that appears in server log when the server has crashed.
+     * Return null to skip auto-detection of crashes.
+     */
+    public function getCrashDetectionString(): ?string;
+
     // --- Mods & Assets ---
 
     /**

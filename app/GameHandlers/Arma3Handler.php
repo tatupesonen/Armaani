@@ -80,6 +80,11 @@ class Arma3Handler implements GameHandler
         return null;
     }
 
+    public function getCrashDetectionString(): ?string
+    {
+        return null;
+    }
+
     public function symlinkMods(Server $server): void
     {
         $preset = $server->activePreset;

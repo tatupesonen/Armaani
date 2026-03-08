@@ -6,7 +6,8 @@ export type ServerStatus =
     | 'booting'
     | 'downloading_mods'
     | 'running'
-    | 'stopping';
+    | 'stopping'
+    | 'crashed';
 
 export type InstallationStatus =
     | 'queued'
@@ -43,6 +44,7 @@ export type Server = {
     active_preset_id: number | null;
     game_install_id: number | null;
     status: ServerStatus;
+    auto_restart: boolean;
     additional_params: string | null;
     verify_signatures: boolean;
     allowed_file_patching: boolean;
@@ -170,7 +172,6 @@ export type ReforgerSettings = {
     server_id: number;
     scenario_id: string | null;
     third_person_view_enabled: boolean;
-    backend_log_enabled: boolean;
     max_fps: number;
     cross_platform: boolean;
 };

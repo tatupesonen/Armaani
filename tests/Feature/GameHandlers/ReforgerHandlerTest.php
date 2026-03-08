@@ -128,7 +128,7 @@ class ReforgerHandlerTest extends TestCase
         $this->assertContains('-profile', $command);
         $this->assertContains($server->getProfilesPath(), $command);
         $this->assertContains('60', $command);       // default maxFPS
-        $this->assertContains('-backendlog', $command); // default enabled
+        $this->assertNotContains('-backendlog', $command);
     }
 
     public function test_build_launch_command_uses_custom_max_fps(): void
@@ -140,17 +140,6 @@ class ReforgerHandlerTest extends TestCase
         $command = $this->handler->buildLaunchCommand($server);
 
         $this->assertContains('120', $command);
-    }
-
-    public function test_build_launch_command_omits_backendlog_when_disabled(): void
-    {
-        $server = $this->createReforgerServer();
-        $server->reforgerSettings()->update(['backend_log_enabled' => false]);
-        $server->refresh();
-
-        $command = $this->handler->buildLaunchCommand($server);
-
-        $this->assertNotContains('-backendlog', $command);
     }
 
     public function test_build_launch_command_includes_additional_params(): void

@@ -34,6 +34,7 @@ class StoreServerRequest extends FormRequest
             'persistent' => ['boolean'],
             'von_enabled' => ['boolean'],
             'additional_server_options' => ['nullable', 'string', 'max:5000'],
+            'auto_restart' => ['boolean'],
         ];
     }
 }

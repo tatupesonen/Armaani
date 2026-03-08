@@ -46,6 +46,7 @@ export function serverStatusVariant(
         downloading_mods: 'warning',
         stopping: 'danger',
         stopped: 'secondary',
+        crashed: 'danger',
     };
 
     return map[status] ?? 'secondary';

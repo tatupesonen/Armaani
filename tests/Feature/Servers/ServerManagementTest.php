@@ -435,7 +435,7 @@ class ServerManagementTest extends TestCase
         $this->assertFalse($server->reforgerSettings->third_person_view_enabled);
     }
 
-    public function test_update_reforger_server_saves_backend_log_and_max_fps(): void
+    public function test_update_reforger_server_saves_max_fps(): void
     {
         $server = Server::factory()->forReforger()->create();
         $server->reforgerSettings()->create([]);
@@ -449,14 +449,12 @@ class ServerManagementTest extends TestCase
                 'game_install_id' => $server->game_install_id,
                 'scenario_id' => '{ECC61978EDCC2B5A}Missions/23_Campaign.conf',
                 'third_person_view_enabled' => true,
-                'backend_log_enabled' => false,
                 'max_fps' => 120,
             ])
             ->assertRedirect()
             ->assertSessionHas('success');
 
         $server->refresh();
-        $this->assertFalse($server->reforgerSettings->backend_log_enabled);
         $this->assertEquals(120, $server->reforgerSettings->max_fps);
     }
 

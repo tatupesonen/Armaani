@@ -6,10 +6,13 @@ use App\Enums\ServerStatus;
 use App\Events\ServerLogOutput;
 use App\Events\ServerStatusChanged;
 use App\GameManager;
+use App\Jobs\StartServerJob;
+use App\Jobs\StopServerJob;
 use App\Models\Server;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Log;
 
-class DetectServerBooted
+class DetectServerEvents
 {
     /**
      * Handle the event.
@@ -18,6 +21,7 @@ class DetectServerBooted
      * - Boot detection string: Booting/DownloadingMods → Running
      * - Mod download started string: Booting → DownloadingMods
      * - Mod download finished string: DownloadingMods → Booting
+     * - Crash detection string: Running/Booting/DownloadingMods → Crashed (with optional auto-restart)
      */
     public function handle(ServerLogOutput $event): void
     {
@@ -65,19 +69,43 @@ class DetectServerBooted
 
         // Check for boot detection (Booting/DownloadingMods → Running)
         $bootString = $handler->getBootDetectionString();
-        if ($bootString === null || ! str_contains($event->line, $bootString)) {
+        if ($bootString !== null && str_contains($event->line, $bootString)) {
+            $updated = Server::query()
+                ->where('id', $event->serverId)
+                ->whereIn('status', [ServerStatus::Booting, ServerStatus::DownloadingMods])
+                ->update(['status' => ServerStatus::Running]);
+
+            if ($updated) {
+                $serverName = Server::query()->where('id', $event->serverId)->value('name') ?? 'Server';
+                Log::info("[Server:{$event->serverId}] Boot detected — status changed to Running");
+                ServerStatusChanged::dispatch($event->serverId, ServerStatus::Running->value, $serverName);
+            }
+
             return;
         }
 
-        $updated = Server::query()
-            ->where('id', $event->serverId)
-            ->whereIn('status', [ServerStatus::Booting, ServerStatus::DownloadingMods])
-            ->update(['status' => ServerStatus::Running]);
+        // Check for crash detection (Running/Booting/DownloadingMods → Crashed)
+        $crashString = $handler->getCrashDetectionString();
+        if ($crashString !== null && str_contains($event->line, $crashString)) {
+            $updated = Server::query()
+                ->where('id', $event->serverId)
+                ->whereIn('status', [ServerStatus::Running, ServerStatus::Booting, ServerStatus::DownloadingMods])
+                ->update(['status' => ServerStatus::Crashed]);
 
-        if ($updated) {
-            $serverName = Server::query()->where('id', $event->serverId)->value('name') ?? 'Server';
-            Log::info("[Server:{$event->serverId}] Boot detected — status changed to Running");
-            ServerStatusChanged::dispatch($event->serverId, ServerStatus::Running->value, $serverName);
+            if ($updated) {
+                $server = $server->fresh();
+                $serverName = $server->name ?? 'Server';
+                Log::warning("[Server:{$event->serverId}] Crash detected — status changed to Crashed");
+                ServerStatusChanged::dispatch($event->serverId, ServerStatus::Crashed->value, $serverName);
+
+                if ($server->auto_restart) {
+                    Log::info("[Server:{$event->serverId}] Auto-restart enabled — queuing restart");
+                    Bus::chain([
+                        new StopServerJob($server),
+                        new StartServerJob($server),
+                    ])->dispatch();
+                }
+            }
         }
     }
 }

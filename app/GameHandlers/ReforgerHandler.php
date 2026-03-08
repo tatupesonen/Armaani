@@ -21,7 +21,6 @@ class ReforgerHandler implements GameHandler
         $profilesPath = $server->getProfilesPath();
         $settings = $server->reforgerSettings;
         $maxFps = $settings?->max_fps ?? 60;
-        $backendLogEnabled = $settings?->backend_log_enabled ?? true;
 
         $params = [
             $binary,
@@ -29,10 +28,6 @@ class ReforgerHandler implements GameHandler
             '-profile', $profilesPath,
             '-maxFPS', (string) $maxFps,
         ];
-
-        if ($backendLogEnabled) {
-            $params[] = '-backendlog';
-        }
 
         if ($server->additional_params) {
             $additionalArgs = preg_split('/\s+/', trim($server->additional_params), -1, PREG_SPLIT_NO_EMPTY);
@@ -130,6 +125,11 @@ class ReforgerHandler implements GameHandler
         return 'Required addons are ready to use.';
     }
 
+    public function getCrashDetectionString(): ?string
+    {
+        return null;
+    }
+
     public function symlinkMods(Server $server): void
     {
         // No-op: Reforger downloads its own mods at server startup
@@ -175,7 +175,6 @@ class ReforgerHandler implements GameHandler
         return [
             'scenario_id' => ['required', 'string', 'regex:/^\{[0-9A-F]{16}\}[a-zA-Z0-9_.\/ -]+$/'],
             'third_person_view_enabled' => ['boolean'],
-            'backend_log_enabled' => ['boolean'],
             'max_fps' => ['integer', 'min:10', 'max:240'],
             'cross_platform' => ['boolean'],
         ];

@@ -30,6 +30,7 @@ class UpdateServerRequest extends FormRequest
             'active_preset_id' => ['nullable', 'exists:mod_presets,id'],
             'game_install_id' => ['required', 'exists:game_installs,id'],
             'additional_params' => ['nullable', 'string', 'max:1000'],
+            'auto_restart' => ['boolean'],
             ...$handler->serverValidationRules(),
             ...$handler->settingsValidationRules(),
         ];
