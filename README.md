@@ -35,6 +35,23 @@ The recommended way to run Armaani is with Docker. The image bundles SteamCMD, P
 
 ### Quick Start
 
+Create a `docker-compose.yml`:
+
+```yaml
+services:
+    armaani:
+        image: tatupesonen/armaani:latest
+        container_name: armaani
+        network_mode: host
+        volumes:
+            - ./storage:/var/www/html/storage
+        environment:
+            - SITE_ADDRESS=${SITE_ADDRESS:-:80}
+        restart: unless-stopped
+```
+
+Then start it:
+
 ```bash
 docker compose up -d
 ```
@@ -54,21 +71,6 @@ docker logs armaani
 Look for the `ADMIN ACCOUNT CREATED` box with the email and password.
 
 ### Configuration
-
-The `docker-compose.yml` file:
-
-```yaml
-services:
-    armaani:
-        build: .
-        container_name: armaani
-        network_mode: host
-        volumes:
-            - ./storage:/var/www/html/storage
-        environment:
-            - SITE_ADDRESS=:80
-        restart: unless-stopped
-```
 
 | Variable       | Default | Description                                                                                                                           |
 | -------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------- |
@@ -124,9 +126,13 @@ docker exec armaani php artisan user:create-admin --email=you@example.com --pass
 
 > The command is a no-op if users already exist. To reset, delete the SQLite database and restart.
 
-### Building the Image Manually
+### Building from Source
+
+If you prefer to build the image yourself instead of using the published one:
 
 ```bash
+git clone https://github.com/tatupesonen/Armaani.git
+cd Armaani
 docker build -t armaani .
 docker run -d --name armaani --network host -v ./storage:/var/www/html/storage armaani
 ```
