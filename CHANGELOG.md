@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.0](https://github.com/tatupesonen/Armaani/compare/v0.3.3...v1.0.0) (2026-03-08)
+
+
+### Features
+
+* display app version in sidebar and auto-bump on release ([2f655e0](https://github.com/tatupesonen/Armaani/commit/2f655e0f3d8ba3b62136ee95f5d582d7968ce620))
+
 ## [0.3.3](https://github.com/tatupesonen/Armaani/compare/v0.3.2...v0.3.3) (2026-03-08)
 
 
