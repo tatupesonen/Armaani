@@ -1,4 +1,3 @@
-import echo from '@/echo';
 import { usePage } from '@inertiajs/react';
 import {
     CheckCircle,
@@ -15,8 +14,9 @@ import {
     useEffect,
     useRef,
     useState,
-    type ReactNode,
 } from 'react';
+import type { ReactNode } from 'react';
+import echo from '@/echo';
 
 type ToastVariant = 'success' | 'error' | 'info' | 'warning';
 
@@ -143,6 +143,15 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         serverToastsRef.current = serverToasts;
     }, [serverToasts]);
 
+    const removeToast = useCallback((id: number) => {
+        setToasts((prev) =>
+            prev.map((t) => (t.id === id ? { ...t, visible: false } : t)),
+        );
+        setTimeout(() => {
+            setToasts((prev) => prev.filter((t) => t.id !== id));
+        }, 300);
+    }, []);
+
     const addToast = useCallback(
         (
             message: string,
@@ -168,17 +177,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 setTimeout(() => removeToast(id), duration);
             }
         },
-        [],
+        [removeToast],
     );
-
-    const removeToast = useCallback((id: number) => {
-        setToasts((prev) =>
-            prev.map((t) => (t.id === id ? { ...t, visible: false } : t)),
-        );
-        setTimeout(() => {
-            setToasts((prev) => prev.filter((t) => t.id !== id));
-        }, 300);
-    }, []);
 
     const updateServerStatus = useCallback(
         ({ id, name, status }: ActiveServer) => {

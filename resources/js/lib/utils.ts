@@ -1,8 +1,8 @@
-import type { InstallationStatus, ServerStatus } from '@/types/game';
 import type { InertiaLinkProps } from '@inertiajs/react';
 import { clsx } from 'clsx';
 import type { ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import type { InstallationStatus, ServerStatus } from '@/types/game';
 
 export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));

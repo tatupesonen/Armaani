@@ -2,6 +2,7 @@ import { router } from '@inertiajs/react';
 import axios from 'axios';
 import { Check, ChevronDown, Loader2, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { reforgerScenarios } from '@/actions/App/Http/Controllers/ServerController';
 import BackupSection from '@/components/servers/backup-section';
 import DifficultySettingsSection from '@/components/servers/difficulty-settings-section';
 import NetworkSettingsSection from '@/components/servers/network-settings-section';
@@ -19,7 +20,6 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { gameTypeLabel } from '@/lib/utils';
-import { reforgerScenarios } from '@/actions/App/Http/Controllers/ServerController';
 import { update } from '@/routes/servers';
 import type { GameInstall, ModPreset, Server } from '@/types';
 

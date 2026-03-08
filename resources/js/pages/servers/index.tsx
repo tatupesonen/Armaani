@@ -1,10 +1,10 @@
 import { Head, router, usePoll } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import echo from '@/echo';
 import Heading from '@/components/heading';
 import CreateServerDialog from '@/components/servers/create-server-dialog';
 import ServerCard from '@/components/servers/server-card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -15,8 +15,8 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import echo from '@/echo';
 import AppLayout from '@/layouts/app-layout';
 import { index as serversIndex, destroy } from '@/routes/servers';
 import type { BreadcrumbItem, GameInstall, ModPreset, Server } from '@/types';

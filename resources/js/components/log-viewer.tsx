@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import echo from '@/echo';
 import { Progress } from '@/components/ui/progress';
+import echo from '@/echo';
 
 type LogViewerProps = {
     channel: string;

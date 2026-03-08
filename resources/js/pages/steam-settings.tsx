@@ -1,14 +1,19 @@
 import { Head, useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
-    Check,
     KeyRound,
     Settings,
     Shield,
     ShieldCheck,
-    X,
 } from 'lucide-react';
 import { useState } from 'react';
+import {
+    saveCredentials,
+    saveApiKey,
+    saveSettings,
+    verifyLogin,
+    verifyApiKey,
+} from '@/actions/App/Http/Controllers/SteamSettingsController';
 import Heading from '@/components/heading';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -24,13 +29,6 @@ import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import AppLayout from '@/layouts/app-layout';
 import { steamSettings } from '@/routes';
-import {
-    saveCredentials,
-    saveApiKey,
-    saveSettings,
-    verifyLogin,
-    verifyApiKey,
-} from '@/actions/App/Http/Controllers/SteamSettingsController';
 import type { BreadcrumbItem } from '@/types';
 
 type AccountInfo = {

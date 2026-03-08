@@ -1,7 +1,5 @@
 import { Head, useForm } from '@inertiajs/react';
-import { useState } from 'react';
 import Heading from '@/components/heading';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';

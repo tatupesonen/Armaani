@@ -1,5 +1,5 @@
-import type { Auth } from '@/types/auth';
 import type Pusher from 'pusher-js';
+import type { Auth } from '@/types/auth';
 
 declare global {
     interface Window {

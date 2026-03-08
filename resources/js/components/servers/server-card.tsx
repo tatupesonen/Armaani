@@ -11,9 +11,9 @@ import {
     X,
 } from 'lucide-react';
 import { useCallback, useState } from 'react';
+import LogViewer from '@/components/log-viewer';
 import HeadlessClientControls from '@/components/servers/headless-client-controls';
 import ServerEditPanel from '@/components/servers/server-edit-panel';
-import LogViewer from '@/components/log-viewer';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { gameTypeLabel, serverStatusVariant } from '@/lib/utils';

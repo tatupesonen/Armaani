@@ -2,6 +2,7 @@ import { Head, router, useForm } from '@inertiajs/react';
 import { Download, Trash2, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
 import Heading from '@/components/heading';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -12,7 +13,6 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import AppLayout from '@/layouts/app-layout';
