@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.3](https://github.com/tatupesonen/Armaani/compare/v0.3.2...v0.3.3) (2026-03-08)
+
+
+### Bug Fixes
+
+* define SIGTERM and SIGKILL fallbacks when pcntl extension is unavailable ([c3d4ce1](https://github.com/tatupesonen/Armaani/commit/c3d4ce1936e2185f0f2a57125e54934620213164))
+
 ## [0.3.2](https://github.com/tatupesonen/Armaani/compare/v0.3.1...v0.3.2) (2026-03-08)
 
 
