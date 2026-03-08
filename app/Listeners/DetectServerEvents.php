@@ -6,6 +6,7 @@ use App\Enums\ServerStatus;
 use App\Events\ServerLogOutput;
 use App\Events\ServerStatusChanged;
 use App\GameManager;
+use App\Jobs\SendDiscordWebhookJob;
 use App\Jobs\StartServerJob;
 use App\Jobs\StopServerJob;
 use App\Models\Server;
@@ -97,6 +98,11 @@ class DetectServerEvents
                 $serverName = $server->name ?? 'Server';
                 Log::warning("[Server:{$event->serverId}] Crash detected — status changed to Crashed");
                 ServerStatusChanged::dispatch($event->serverId, ServerStatus::Crashed->value, $serverName);
+
+                SendDiscordWebhookJob::dispatch(
+                    "**{$serverName}** has crashed.\n> {$event->line}",
+                    'armaani',
+                );
 
                 if ($server->auto_restart) {
                     Log::info("[Server:{$event->serverId}] Auto-restart enabled — queuing restart");

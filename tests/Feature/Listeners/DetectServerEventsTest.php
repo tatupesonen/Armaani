@@ -7,6 +7,7 @@ use App\Enums\ServerStatus;
 use App\Events\ServerLogOutput;
 use App\Events\ServerStatusChanged;
 use App\GameManager;
+use App\Jobs\SendDiscordWebhookJob;
 use App\Jobs\StartServerJob;
 use App\Jobs\StopServerJob;
 use App\Listeners\DetectServerEvents;
@@ -186,6 +187,27 @@ class DetectServerEventsTest extends TestCase
         });
     }
 
+    public function test_crash_detection_dispatches_discord_webhook_job(): void
+    {
+        Event::fake([ServerStatusChanged::class]);
+        Bus::fake();
+        $this->mockGameManagerWithCrashString('Segmentation fault');
+
+        $server = Server::factory()->create([
+            'name' => 'My Server',
+            'status' => ServerStatus::Running,
+        ]);
+
+        $listener = new DetectServerEvents;
+        $listener->handle(new ServerLogOutput($server->id, 'Segmentation fault (core dumped)'));
+
+        Bus::assertDispatched(SendDiscordWebhookJob::class, function (SendDiscordWebhookJob $job) {
+            return str_contains($job->content, '**My Server** has crashed')
+                && str_contains($job->content, 'Segmentation fault (core dumped)')
+                && $job->username === 'armaani';
+        });
+    }
+
     public function test_crash_detection_dispatches_restart_when_auto_restart_enabled(): void
     {
         Event::fake([ServerStatusChanged::class]);
@@ -224,7 +246,8 @@ class DetectServerEventsTest extends TestCase
 
         $this->assertEquals(ServerStatus::Crashed, $server->fresh()->status);
 
-        Bus::assertNothingDispatched();
+        Bus::assertNotDispatched(StopServerJob::class);
+        Bus::assertNotDispatched(StartServerJob::class);
     }
 
     public function test_crash_detection_transitions_booting_server_to_crashed(): void
