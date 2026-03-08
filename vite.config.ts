@@ -26,9 +26,7 @@ export default defineConfig(({ mode }) => {
         server: {
             host: '0.0.0.0',
             origin: `http://${env.SERVER_HOST || 'localhost'}:5173`,
-            cors: {
-                origin: env.APP_URL,
-            },
+            cors: true,
         },
         esbuild: {
             jsx: 'automatic',
