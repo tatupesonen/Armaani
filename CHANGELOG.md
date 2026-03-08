@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/tatupesonen/Armaani/compare/v1.0.0...v1.1.0) (2026-03-08)
+
+
+### Features
+
+* front page ([405f2b8](https://github.com/tatupesonen/Armaani/commit/405f2b86425d3778ae5d199c5454f8cf9cdfd63a))
+
 ## [1.0.0](https://github.com/tatupesonen/Armaani/compare/v0.3.3...v1.0.0) (2026-03-08)
 
 
