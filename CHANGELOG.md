@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/tatupesonen/Armaani/compare/v1.1.0...v1.2.0) (2026-03-08)
+
+
+### Features
+
+* vendor fonts, add OG image, refresh welcome page and branding ([3dba79b](https://github.com/tatupesonen/Armaani/commit/3dba79be4104172ac8ebae6069e96ef4c880746b))
+
 ## [1.1.0](https://github.com/tatupesonen/Armaani/compare/v1.0.0...v1.1.0) (2026-03-08)
 
 
