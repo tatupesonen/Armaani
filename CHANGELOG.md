@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/tatupesonen/Armaani/compare/v1.2.0...v1.3.0) (2026-03-09)
+
+
+### Features
+
+* add server lifecycle demo to welcome page and complete SEO meta tags ([fcf1852](https://github.com/tatupesonen/Armaani/commit/fcf1852c3033212702f72b92b77754a84b5511a7))
+
 ## [1.2.0](https://github.com/tatupesonen/Armaani/compare/v1.1.0...v1.2.0) (2026-03-08)
 
 
