@@ -1,4 +1,10 @@
-import { useForm } from '@inertiajs/react';
+import { router } from '@inertiajs/react';
+import { useState } from 'react';
+import GameSettingsRenderer, {
+    getSchemaDefaults,
+    registerCustomComponent,
+} from '@/components/servers/game-settings-renderer';
+import ReforgerScenarioPicker from '@/components/servers/reforger-scenario-picker';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -17,28 +23,36 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
 import { store } from '@/routes/servers';
-import type { GameInstall, ModPreset } from '@/types';
+import type { GameInstall, ModPreset, ServerGameTypeOption } from '@/types';
 
-type GameTypeOption = {
-    value: string;
-    label: string;
-    defaultPort: number;
-    defaultQueryPort: number;
-    supportsHeadlessClients: boolean;
-    supportsWorkshopMods: boolean;
-    supportsMissionUpload: boolean;
-};
+// Register custom field components
+registerCustomComponent('scenario-picker', ReforgerScenarioPicker);
 
 type CreateServerDialogProps = {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    gameTypes: GameTypeOption[];
+    gameTypes: ServerGameTypeOption[];
     gameInstalls: GameInstall[];
     presets: ModPreset[];
 };
+
+function buildFormDefaults(
+    gt: ServerGameTypeOption,
+    gameInstalls: GameInstall[],
+): Record<string, unknown> {
+    const defaultInstall = gameInstalls.find((gi) => gi.game_type === gt.value);
+
+    return {
+        game_type: gt.value,
+        name: '',
+        port: gt.defaultPort,
+        max_players: 32,
+        game_install_id: defaultInstall?.id?.toString() ?? '',
+        active_preset_id: '',
+        ...getSchemaDefaults(gt.settingsSchema, true),
+    };
+}
 
 export default function CreateServerDialog({
     open,
@@ -47,89 +61,66 @@ export default function CreateServerDialog({
     gameInstalls,
     presets,
 }: CreateServerDialogProps) {
-    const form = useForm({
-        game_type: 'arma3',
-        name: '',
-        port: 2302,
-        query_port: 2303,
-        max_players: 32,
-        password: '',
-        admin_password: '',
-        description: '',
-        active_preset_id: '' as string,
-        game_install_id: '' as string,
-        additional_params: '',
-        verify_signatures: true,
-        allowed_file_patching: false,
-        battle_eye: true,
-        persistent: false,
-        von_enabled: true,
-        additional_server_options: '',
-    });
+    const firstGt = gameTypes[0];
+    const [data, setData] = useState<Record<string, unknown>>(() =>
+        buildFormDefaults(firstGt, gameInstalls),
+    );
+    const [errors, setErrors] = useState<Record<string, string>>({});
+    const [processing, setProcessing] = useState(false);
 
-    const isArma3 = form.data.game_type === 'arma3';
+    const currentGt = gameTypes.find((g) => g.value === data.game_type);
     const filteredInstalls = gameInstalls.filter(
-        (gi) => gi.game_type === form.data.game_type,
+        (gi) => gi.game_type === data.game_type,
     );
     const filteredPresets = presets.filter(
-        (p) => p.game_type === form.data.game_type,
+        (p) => p.game_type === data.game_type,
     );
 
     function onGameTypeChange(value: string) {
         const gt = gameTypes.find((g) => g.value === value);
-        const defaultInstall = gameInstalls.find(
-            (gi) => gi.game_type === value,
-        );
-        form.setData((prev) => ({
-            ...prev,
-            game_type: value,
-            port: gt?.defaultPort ?? prev.port,
-            query_port: gt?.defaultQueryPort ?? prev.query_port,
-            game_install_id: defaultInstall?.id?.toString() ?? '',
-            active_preset_id: '',
-        }));
+        if (!gt) return;
+        setData(buildFormDefaults(gt, gameInstalls));
+        setErrors({});
     }
 
     function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
-        form.transform((data) => ({
+        setProcessing(true);
+
+        const payload: Record<string, unknown> = {
             ...data,
-            active_preset_id: data.active_preset_id || null,
+            active_preset_id: (data.active_preset_id as string) || null,
             game_install_id: Number(data.game_install_id),
-        }));
-        form.post(store.url(), {
-            onSuccess: () => onOpenChange(false),
-        });
+        };
+
+        router.post(
+            store.url(),
+            payload as Record<string, string | number | boolean | null>,
+            {
+                onSuccess: () => {
+                    setErrors({});
+                    onOpenChange(false);
+                },
+                onError: (errs) => setErrors(errs),
+                onFinish: () => setProcessing(false),
+            },
+        );
     }
 
     function handleOpenChange(isOpen: boolean) {
         if (isOpen) {
-            const gt = gameTypes[0];
-            const defaultInstall = gameInstalls.find(
-                (gi) => gi.game_type === gt.value,
-            );
-            form.setData({
-                game_type: gt.value,
-                name: '',
-                port: gt.defaultPort,
-                query_port: gt.defaultQueryPort,
-                max_players: 32,
-                password: '',
-                admin_password: '',
-                description: '',
-                active_preset_id: '',
-                game_install_id: defaultInstall?.id?.toString() ?? '',
-                additional_params: '',
-                verify_signatures: true,
-                allowed_file_patching: false,
-                battle_eye: true,
-                persistent: false,
-                von_enabled: true,
-                additional_server_options: '',
-            });
-            form.clearErrors();
+            setData(buildFormDefaults(firstGt, gameInstalls));
+            setErrors({});
         }
         onOpenChange(isOpen);
+    }
+
+    function set(key: string, value: unknown) {
+        setData((prev) => ({ ...prev, [key]: value }));
+    }
+
+    function batchSet(values: Record<string, unknown>) {
+        setData((prev) => ({ ...prev, ...values }));
     }
 
     return (
@@ -146,7 +137,7 @@ export default function CreateServerDialog({
                     <div className="space-y-2">
                         <Label>Game</Label>
                         <Select
-                            value={form.data.game_type}
+                            value={data.game_type as string}
                             onValueChange={onGameTypeChange}
                         >
                             <SelectTrigger>
@@ -165,72 +156,48 @@ export default function CreateServerDialog({
                     <div className="space-y-2">
                         <Label>Name</Label>
                         <Input
-                            value={form.data.name}
-                            onChange={(e) =>
-                                form.setData('name', e.target.value)
-                            }
+                            value={data.name as string}
+                            onChange={(e) => set('name', e.target.value)}
                             required
                         />
-                        {form.errors.name && (
+                        {errors.name && (
                             <p className="text-sm text-destructive">
-                                {form.errors.name}
+                                {errors.name}
                             </p>
                         )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label>Game Port</Label>
-                            <Input
-                                type="number"
-                                value={form.data.port}
-                                onChange={(e) => {
-                                    const port = Number(e.target.value);
-                                    form.setData((prev) => ({
-                                        ...prev,
-                                        port,
-                                        query_port: port + 1,
-                                    }));
-                                }}
-                                required
-                            />
-                            {form.errors.port && (
-                                <p className="text-sm text-destructive">
-                                    {form.errors.port}
-                                </p>
-                            )}
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Query Port</Label>
-                            <Input
-                                type="number"
-                                value={form.data.query_port}
-                                onChange={(e) =>
-                                    form.setData(
-                                        'query_port',
-                                        Number(e.target.value),
-                                    )
-                                }
-                                required
-                            />
-                            {form.errors.query_port && (
-                                <p className="text-sm text-destructive">
-                                    {form.errors.query_port}
-                                </p>
-                            )}
-                        </div>
+                    <div className="space-y-2">
+                        <Label>Game Port</Label>
+                        <Input
+                            type="number"
+                            value={data.port as number}
+                            onChange={(e) => {
+                                const port = Number(e.target.value);
+                                setData((prev) => ({
+                                    ...prev,
+                                    port,
+                                    ...('query_port' in prev
+                                        ? { query_port: port + 1 }
+                                        : {}),
+                                }));
+                            }}
+                            required
+                        />
+                        {errors.port && (
+                            <p className="text-sm text-destructive">
+                                {errors.port}
+                            </p>
+                        )}
                     </div>
 
                     <div className="space-y-2">
                         <Label>Max Players</Label>
                         <Input
                             type="number"
-                            value={form.data.max_players}
+                            value={data.max_players as number}
                             onChange={(e) =>
-                                form.setData(
-                                    'max_players',
-                                    Number(e.target.value),
-                                )
+                                set('max_players', Number(e.target.value))
                             }
                             required
                         />
@@ -239,10 +206,8 @@ export default function CreateServerDialog({
                     <div className="space-y-2">
                         <Label>Game Install</Label>
                         <Select
-                            value={form.data.game_install_id}
-                            onValueChange={(v) =>
-                                form.setData('game_install_id', v)
-                            }
+                            value={data.game_install_id as string}
+                            onValueChange={(v) => set('game_install_id', v)}
                         >
                             <SelectTrigger>
                                 <SelectValue placeholder="Select install..." />
@@ -258,9 +223,9 @@ export default function CreateServerDialog({
                                 ))}
                             </SelectContent>
                         </Select>
-                        {form.errors.game_install_id && (
+                        {errors.game_install_id && (
                             <p className="text-sm text-destructive">
-                                {form.errors.game_install_id}
+                                {errors.game_install_id}
                             </p>
                         )}
                     </div>
@@ -269,9 +234,9 @@ export default function CreateServerDialog({
                         <div className="space-y-2">
                             <Label>Mod Preset (optional)</Label>
                             <Select
-                                value={form.data.active_preset_id}
+                                value={data.active_preset_id as string}
                                 onValueChange={(v) =>
-                                    form.setData('active_preset_id', v)
+                                    set('active_preset_id', v)
                                 }
                             >
                                 <SelectTrigger>
@@ -291,121 +256,16 @@ export default function CreateServerDialog({
                         </div>
                     )}
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label>Password (optional)</Label>
-                            <Input
-                                value={form.data.password}
-                                onChange={(e) =>
-                                    form.setData('password', e.target.value)
-                                }
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Admin Password (optional)</Label>
-                            <Input
-                                value={form.data.admin_password}
-                                onChange={(e) =>
-                                    form.setData(
-                                        'admin_password',
-                                        e.target.value,
-                                    )
-                                }
-                            />
-                        </div>
-                    </div>
-
-                    {isArma3 && (
-                        <div className="space-y-3 rounded-lg border p-3">
-                            <p className="text-sm font-medium">
-                                Arma 3 Options
-                            </p>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="flex items-center gap-2">
-                                    <Switch
-                                        checked={form.data.verify_signatures}
-                                        onCheckedChange={(v) =>
-                                            form.setData('verify_signatures', v)
-                                        }
-                                    />
-                                    <Label>Verify Signatures</Label>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <Switch
-                                        checked={form.data.battle_eye}
-                                        onCheckedChange={(v) =>
-                                            form.setData('battle_eye', v)
-                                        }
-                                    />
-                                    <Label>BattlEye</Label>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <Switch
-                                        checked={form.data.von_enabled}
-                                        onCheckedChange={(v) =>
-                                            form.setData('von_enabled', v)
-                                        }
-                                    />
-                                    <Label>VON</Label>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <Switch
-                                        checked={form.data.persistent}
-                                        onCheckedChange={(v) =>
-                                            form.setData('persistent', v)
-                                        }
-                                    />
-                                    <Label>Persistent</Label>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <Switch
-                                        checked={
-                                            form.data.allowed_file_patching
-                                        }
-                                        onCheckedChange={(v) =>
-                                            form.setData(
-                                                'allowed_file_patching',
-                                                v,
-                                            )
-                                        }
-                                    />
-                                    <Label>File Patching</Label>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="space-y-2">
-                        <Label>Additional Parameters (optional)</Label>
-                        <Input
-                            value={form.data.additional_params}
-                            onChange={(e) =>
-                                form.setData(
-                                    'additional_params',
-                                    e.target.value,
-                                )
-                            }
-                            placeholder="-noSplash -hugepages"
+                    {/* Schema-driven create sections (e.g., Server Rules for Arma 3) */}
+                    {currentGt && (
+                        <GameSettingsRenderer
+                            schema={currentGt.settingsSchema}
+                            data={data}
+                            errors={errors}
+                            onChange={set}
+                            onBatchChange={batchSet}
+                            mode="create"
                         />
-                    </div>
-
-                    {isArma3 && (
-                        <div className="space-y-2">
-                            <Label>
-                                Additional server.cfg Options (optional)
-                            </Label>
-                            <Textarea
-                                value={form.data.additional_server_options}
-                                onChange={(e) =>
-                                    form.setData(
-                                        'additional_server_options',
-                                        e.target.value,
-                                    )
-                                }
-                                rows={3}
-                                placeholder="Raw config directives appended to server.cfg"
-                            />
-                        </div>
                     )}
 
                     <DialogFooter>
@@ -416,7 +276,7 @@ export default function CreateServerDialog({
                         >
                             Cancel
                         </Button>
-                        <Button type="submit" disabled={form.processing}>
+                        <Button type="submit" disabled={processing}>
                             Create Server
                         </Button>
                     </DialogFooter>

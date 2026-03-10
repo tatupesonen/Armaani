@@ -2,6 +2,8 @@
 
 namespace App\Contracts;
 
+use App\Models\Server;
+
 interface DetectsServerState
 {
     /**
@@ -31,4 +33,10 @@ interface DetectsServerState
      * Return null if this game does not download mods at startup.
      */
     public function getModDownloadFinishedString(): ?string;
+
+    /**
+     * Whether the server should be automatically restarted after a crash.
+     * Only called for games that support crash detection.
+     */
+    public function shouldAutoRestart(Server $server): bool;
 }

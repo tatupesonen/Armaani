@@ -47,6 +47,7 @@ trait MocksGameManager
             $handler->shouldReceive('getCrashDetectionStrings')->andReturn([]);
             $handler->shouldReceive('getModDownloadStartedString')->andReturnNull();
             $handler->shouldReceive('getModDownloadFinishedString')->andReturnNull();
+            $handler->shouldReceive('shouldAutoRestart')->andReturn(false);
             $handler->shouldReceive('symlinkMods')->andReturnNull();
             $handler->shouldReceive('symlinkMissions')->andReturnNull();
             $handler->shouldReceive('copyBiKeys')->andReturnNull();
@@ -58,6 +59,7 @@ trait MocksGameManager
             $handler->shouldReceive('getCrashDetectionStrings')->andReturn([]);
             $handler->shouldReceive('getModDownloadStartedString')->andReturn('Addon Download started');
             $handler->shouldReceive('getModDownloadFinishedString')->andReturn('Required addons are ready to use.');
+            $handler->shouldReceive('shouldAutoRestart')->andReturn(false);
         }
 
         $manager = Mockery::mock(GameManager::class);

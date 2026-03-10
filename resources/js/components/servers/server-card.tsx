@@ -28,12 +28,13 @@ import {
     launchCommand,
     log as serverLog,
 } from '@/routes/servers';
-import type { GameInstall, ModPreset, Server } from '@/types';
+import type { GameInstall, ModPreset, Server, SettingsSection } from '@/types';
 
 type ServerCardProps = {
     server: Server;
     presets: ModPreset[];
     gameInstalls: GameInstall[];
+    settingsSchema: SettingsSection[];
     onDelete: (id: number) => void;
 };
 
@@ -74,6 +75,7 @@ export default function ServerCard({
     server,
     presets,
     gameInstalls,
+    settingsSchema,
     onDelete,
 }: ServerCardProps) {
     const [showLogs, setShowLogs] = useState(
@@ -295,6 +297,7 @@ export default function ServerCard({
                     server={server}
                     presets={presets}
                     gameInstalls={gameInstalls}
+                    settingsSchema={settingsSchema}
                     onCancel={() => setEditing(false)}
                 />
             )}

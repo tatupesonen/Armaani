@@ -189,6 +189,77 @@ export type GameTypeInfo = {
     defaultName: string;
 };
 
+// --- Settings Schema Types ---
+
+export type SettingsFieldOption = {
+    value: string;
+    label: string;
+};
+
+export type SettingsField = {
+    key?: string;
+    label?: string;
+    type:
+        | 'toggle'
+        | 'number'
+        | 'text'
+        | 'textarea'
+        | 'segmented'
+        | 'separator'
+        | 'custom';
+    default?: string | number | boolean;
+    description?: string;
+    source?: string;
+    halfWidth?: boolean;
+    options?: SettingsFieldOption[];
+    min?: number;
+    max?: number;
+    step?: number;
+    storeAsString?: boolean;
+    inputMode?: string;
+    placeholder?: string;
+    required?: boolean;
+    rows?: number;
+    component?: string;
+};
+
+export type SettingsPreset = {
+    label: string;
+    variant: 'ghost' | 'default';
+    icon: 'reset' | 'zap';
+    values: Record<string, string | number | boolean>;
+};
+
+export type SettingsFieldGroup = {
+    columns?: number;
+    fields: SettingsField[];
+};
+
+export type SettingsSection = {
+    title?: string;
+    description?: string;
+    collapsible?: boolean;
+    showOnCreate?: boolean;
+    createLabel?: string;
+    source?: string;
+    layout?: 'columns' | 'rows';
+    advanced?: boolean;
+    presets?: SettingsPreset[];
+    fields?: SettingsField[];
+    groups?: SettingsFieldGroup[];
+};
+
+export type ServerGameTypeOption = {
+    value: GameType;
+    label: string;
+    defaultPort: number;
+    defaultQueryPort: number;
+    supportsHeadlessClients: boolean;
+    supportsWorkshopMods: boolean;
+    supportsMissionUpload: boolean;
+    settingsSchema: SettingsSection[];
+};
+
 export type Mission = {
     name: string;
     size: number;

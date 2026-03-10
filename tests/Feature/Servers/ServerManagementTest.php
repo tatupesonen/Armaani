@@ -327,9 +327,9 @@ class ServerManagementTest extends TestCase
                 'game_type' => 'reforger',
                 'name' => 'Reforger Server',
                 'port' => 2001,
-                'query_port' => 17777,
                 'max_players' => 32,
                 'game_install_id' => $reforgerInstall->id,
+                'scenario_id' => '{ECC61978EDCC2B5A}Missions/23_Campaign.conf',
             ])
             ->assertRedirect()
             ->assertSessionHas('success');
@@ -338,6 +338,7 @@ class ServerManagementTest extends TestCase
         $this->assertNotNull($server);
         $this->assertNotNull($server->reforgerSettings);
         $this->assertTrue($server->reforgerSettings->third_person_view_enabled);
+        $this->assertEquals('{ECC61978EDCC2B5A}Missions/23_Campaign.conf', $server->reforgerSettings->scenario_id);
     }
 
     // ---------------------------------------------------------------

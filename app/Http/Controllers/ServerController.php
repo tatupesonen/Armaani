@@ -61,6 +61,7 @@ class ServerController extends Controller
                     'supportsHeadlessClients' => $handler instanceof SupportsHeadlessClients,
                     'supportsWorkshopMods' => $handler->supportsWorkshopMods(),
                     'supportsMissionUpload' => $handler instanceof SupportsMissions,
+                    'settingsSchema' => $handler->settingsSchema(),
                 ];
             }),
         ]);
@@ -75,6 +76,7 @@ class ServerController extends Controller
 
         $handler = $this->gameManager->driver($gameType->value);
         $handler->createRelatedSettings($server);
+        $handler->updateRelatedSettings($server, $validated);
 
         Log::info(auth_context()." created server: {$server->name}");
 

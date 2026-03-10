@@ -173,11 +173,37 @@ final class ReforgerHandler implements DetectsServerState, GameHandler
         return [];
     }
 
+    public function shouldAutoRestart(Server $server): bool
+    {
+        return false;
+    }
+
+    // --- UI Schema ---
+
+    public function settingsSchema(): array
+    {
+        return [
+            [
+                'title' => 'Reforger Settings',
+                'source' => 'reforger_settings',
+                'fields' => [
+                    ['key' => 'scenario_id', 'label' => 'Scenario ID', 'type' => 'custom', 'component' => 'scenario-picker', 'default' => ''],
+                    ['key' => 'third_person_view_enabled', 'label' => 'Third Person View', 'type' => 'toggle', 'default' => true],
+                    ['key' => 'battle_eye', 'label' => 'BattlEye Anti-Cheat', 'type' => 'toggle', 'default' => true, 'source' => 'server'],
+                    ['key' => 'cross_platform', 'label' => 'Cross-Platform', 'type' => 'toggle', 'default' => false],
+                    ['key' => 'max_fps', 'label' => 'Max FPS', 'type' => 'number', 'default' => 60, 'min' => 10, 'max' => 240, 'description' => 'Recommended: 60-120. Limits server tick rate to prevent excessive CPU usage.'],
+                ],
+            ],
+        ];
+    }
+
     // --- Validation ---
 
-    public function serverValidationRules(): array
+    public function serverValidationRules(?Server $server = null): array
     {
-        return [];
+        return [
+            'battle_eye' => ['boolean'],
+        ];
     }
 
     public function settingsValidationRules(): array

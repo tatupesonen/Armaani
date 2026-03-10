@@ -83,7 +83,7 @@ class DetectServerEvents
                     'Armaani',
                 );
 
-                if ($server->auto_restart) {
+                if ($handler->shouldAutoRestart($server)) {
                     Log::info("{$server->logContext()} Auto-restart enabled — queuing restart");
                     Bus::chain([
                         new StopServerJob($server),

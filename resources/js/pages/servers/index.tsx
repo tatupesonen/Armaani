@@ -19,23 +19,19 @@ import { Button } from '@/components/ui/button';
 import echo from '@/echo';
 import AppLayout from '@/layouts/app-layout';
 import { index as serversIndex, destroy } from '@/routes/servers';
-import type { BreadcrumbItem, GameInstall, ModPreset, Server } from '@/types';
-
-type GameTypeOption = {
-    value: string;
-    label: string;
-    defaultPort: number;
-    defaultQueryPort: number;
-    supportsHeadlessClients: boolean;
-    supportsWorkshopMods: boolean;
-    supportsMissionUpload: boolean;
-};
+import type {
+    BreadcrumbItem,
+    GameInstall,
+    ModPreset,
+    Server,
+    ServerGameTypeOption,
+} from '@/types';
 
 type Props = {
     servers: Server[];
     presets: ModPreset[];
     gameInstalls: GameInstall[];
-    gameTypes: GameTypeOption[];
+    gameTypes: ServerGameTypeOption[];
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -110,6 +106,11 @@ export default function ServersIndex({
                                 server={server}
                                 presets={presets}
                                 gameInstalls={gameInstalls}
+                                settingsSchema={
+                                    gameTypes.find(
+                                        (gt) => gt.value === server.game_type,
+                                    )?.settingsSchema ?? []
+                                }
                                 onDelete={(id) => setDeletingServerId(id)}
                             />
                         ))}

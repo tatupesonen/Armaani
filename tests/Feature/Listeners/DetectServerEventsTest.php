@@ -209,15 +209,14 @@ class DetectServerEventsTest extends TestCase
         });
     }
 
-    public function test_crash_detection_dispatches_restart_when_auto_restart_enabled(): void
+    public function test_crash_detection_dispatches_restart_when_handler_returns_should_auto_restart(): void
     {
         Event::fake([ServerStatusChanged::class]);
         Bus::fake();
-        $listener = $this->makeCrashListener('Segmentation fault');
+        $listener = $this->makeCrashListener('Segmentation fault', shouldAutoRestart: true);
 
         $server = Server::factory()->create([
             'status' => ServerStatus::Running,
-            'auto_restart' => true,
         ]);
 
         $listener->handle(new ServerLogOutput($server->id, 'Segmentation fault (core dumped)'));
@@ -230,15 +229,14 @@ class DetectServerEventsTest extends TestCase
         ]);
     }
 
-    public function test_crash_detection_does_not_dispatch_restart_when_auto_restart_disabled(): void
+    public function test_crash_detection_does_not_dispatch_restart_when_handler_returns_no_auto_restart(): void
     {
         Event::fake([ServerStatusChanged::class]);
         Bus::fake();
-        $listener = $this->makeCrashListener('Segmentation fault');
+        $listener = $this->makeCrashListener('Segmentation fault', shouldAutoRestart: false);
 
         $server = Server::factory()->create([
             'status' => ServerStatus::Running,
-            'auto_restart' => false,
         ]);
 
         $listener->handle(new ServerLogOutput($server->id, 'Segmentation fault (core dumped)'));
@@ -317,13 +315,14 @@ class DetectServerEventsTest extends TestCase
      * Mock the GameManager with a crash detection string and return a fresh listener.
      * Must resolve the listener AFTER registering the mock (constructor injection).
      */
-    private function makeCrashListener(string $crashString): DetectServerEvents
+    private function makeCrashListener(string $crashString, bool $shouldAutoRestart = false): DetectServerEvents
     {
         $handler = Mockery::mock(GameHandler::class.', '.DetectsServerState::class);
         $handler->shouldReceive('getModDownloadStartedString')->andReturnNull();
         $handler->shouldReceive('getModDownloadFinishedString')->andReturnNull();
         $handler->shouldReceive('getBootDetectionStrings')->andReturn([]);
         $handler->shouldReceive('getCrashDetectionStrings')->andReturn([$crashString]);
+        $handler->shouldReceive('shouldAutoRestart')->andReturn($shouldAutoRestart);
 
         $manager = Mockery::mock(GameManager::class);
         $manager->shouldReceive('for')->andReturn($handler);

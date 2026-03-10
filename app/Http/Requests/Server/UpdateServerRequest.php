@@ -21,17 +21,12 @@ class UpdateServerRequest extends FormRequest
 
         return [
             'name' => ['required', 'string', 'max:255'],
-            'port' => ['required', 'integer', 'min:1', 'max:65535', 'different:query_port', Rule::unique('servers', 'port')->ignore($server->id), Rule::unique('servers', 'query_port')->ignore($server->id)],
-            'query_port' => ['required', 'integer', 'min:1', 'max:65535', Rule::unique('servers', 'query_port')->ignore($server->id), Rule::unique('servers', 'port')->ignore($server->id)],
+            'port' => ['required', 'integer', 'min:1', 'max:65535', Rule::unique('servers', 'port')->ignore($server->id), Rule::unique('servers', 'query_port')->ignore($server->id)],
             'max_players' => ['required', 'integer', 'min:1', 'max:256'],
-            'password' => ['nullable', 'string', 'max:255'],
-            'admin_password' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:1000'],
             'active_preset_id' => ['nullable', 'exists:mod_presets,id'],
             'game_install_id' => ['required', 'exists:game_installs,id'],
-            'additional_params' => ['nullable', 'string', 'max:1000'],
-            'auto_restart' => ['boolean'],
-            ...$handler->serverValidationRules(),
+            ...$handler->serverValidationRules($server),
             ...$handler->settingsValidationRules(),
         ];
     }

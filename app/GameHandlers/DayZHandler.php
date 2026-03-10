@@ -76,9 +76,16 @@ final class DayZHandler implements GameHandler
         return $server->getProfilesPath().'/server.log';
     }
 
+    // --- UI Schema ---
+
+    public function settingsSchema(): array
+    {
+        return [];
+    }
+
     // --- Validation ---
 
-    public function serverValidationRules(): array
+    public function serverValidationRules(?Server $server = null): array
     {
         return [];
     }
