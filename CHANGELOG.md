@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.1](https://github.com/tatupesonen/Armaani/compare/v1.6.0...v1.6.1) (2026-03-10)
+
+
+### Bug Fixes
+
+* enable PHP-FPM worker log capture and reduce Caddy log noise in Docker ([1848cee](https://github.com/tatupesonen/Armaani/commit/1848cee31191118d733db86aa09f40fb3117dd90))
+
 ## [1.6.0](https://github.com/tatupesonen/Armaani/compare/v1.5.0...v1.6.0) (2026-03-10)
 
 
