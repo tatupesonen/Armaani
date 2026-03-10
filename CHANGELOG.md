@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.6.0](https://github.com/tatupesonen/Armaani/compare/v1.5.0...v1.6.0) (2026-03-10)
+
+
+### Features
+
+* add Factorio game handler and HTTP download installer infrastru… ([75caeb2](https://github.com/tatupesonen/Armaani/commit/75caeb280e5839f9d0f8ce337c776ff202e82ad3))
+* add Factorio game handler and HTTP download installer infrastructure ([563f0fd](https://github.com/tatupesonen/Armaani/commit/563f0fd201eb8265f6b62d2edf767f1441e9a134))
+
 ## [1.5.0](https://github.com/tatupesonen/Armaani/compare/v1.4.0...v1.5.0) (2026-03-10)
 
 
