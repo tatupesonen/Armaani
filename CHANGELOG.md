@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.2](https://github.com/tatupesonen/Armaani/compare/v1.3.1...v1.3.2) (2026-03-10)
+
+
+### Bug Fixes
+
+* resolve Larastan error, add Larastan to CI, and cover test gaps ([57f5e9b](https://github.com/tatupesonen/Armaani/commit/57f5e9bbee13b4a5adaa9628b792b27d80ef77e1))
+* set explicit target-branch for release-please ([afbc2ac](https://github.com/tatupesonen/Armaani/commit/afbc2acfd3f798f832468cc0011518452e3af45f))
+
 ## [1.3.1](https://github.com/tatupesonen/Armaani/compare/v1.3.0...v1.3.1) (2026-03-09)
 
 
