@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.4.0](https://github.com/tatupesonen/Armaani/compare/v1.3.2...v1.4.0) (2026-03-10)
+
+
+### Features
+
+* add skill for LLMs to generate gamehandlers ([2baf934](https://github.com/tatupesonen/Armaani/commit/2baf934aca6d3e2d81220c05d16150001affab2e))
+* automatic game handler generation ([c1ce131](https://github.com/tatupesonen/Armaani/commit/c1ce1313c4567c890eac918623d1185cf285858c))
+* gameserviceprovider cache, generic frontend over games ([5e78352](https://github.com/tatupesonen/Armaani/commit/5e783521905037d37dad5ee1985f5802aa81fc80))
+* wip ([a99baa5](https://github.com/tatupesonen/Armaani/commit/a99baa57255d591255f5433faecb079470d68450))
+
+
+### Bug Fixes
+
+* wip, add query port ([e915333](https://github.com/tatupesonen/Armaani/commit/e91533358a08052e5c4a916f70d2b27e5cfd1b34))
+
 ## [1.3.2](https://github.com/tatupesonen/Armaani/compare/v1.3.1...v1.3.2) (2026-03-10)
 
 
