@@ -304,6 +304,10 @@ final class Arma3Handler implements DetectsServerState, GameHandler, ManagesModA
                 'createLabel' => 'Arma 3 Options',
                 'source' => 'server',
                 'fields' => [
+                    ['key' => 'query_port', 'label' => 'Steam Query Port', 'type' => 'number', 'default' => $this->defaultQueryPort(), 'min' => 1, 'max' => 65535, 'description' => 'Steam server browser query port. Typically game port + 1.'],
+                    ['key' => 'password', 'label' => 'Server Password', 'type' => 'text', 'default' => '', 'placeholder' => 'Leave empty for no password'],
+                    ['key' => 'admin_password', 'label' => 'Admin Password', 'type' => 'text', 'default' => '', 'placeholder' => 'In-game admin password'],
+                    ['type' => 'separator'],
                     ['key' => 'verify_signatures', 'label' => 'Verify Signatures', 'type' => 'toggle', 'default' => true],
                     ['key' => 'allowed_file_patching', 'label' => 'Allow File Patching', 'type' => 'toggle', 'default' => false],
                     ['key' => 'battle_eye', 'label' => 'BattlEye Anti-Cheat', 'type' => 'toggle', 'default' => true],

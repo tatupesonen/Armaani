@@ -100,20 +100,25 @@ export default function ServersIndex({
                     </Alert>
                 ) : (
                     <div className="space-y-4">
-                        {servers.map((server) => (
-                            <ServerCard
-                                key={server.id}
-                                server={server}
-                                presets={presets}
-                                gameInstalls={gameInstalls}
-                                settingsSchema={
-                                    gameTypes.find(
-                                        (gt) => gt.value === server.game_type,
-                                    )?.settingsSchema ?? []
-                                }
-                                onDelete={(id) => setDeletingServerId(id)}
-                            />
-                        ))}
+                        {servers.map((server) => {
+                            const gt = gameTypes.find(
+                                (g) => g.value === server.game_type,
+                            );
+
+                            return (
+                                <ServerCard
+                                    key={server.id}
+                                    server={server}
+                                    presets={presets}
+                                    gameInstalls={gameInstalls}
+                                    settingsSchema={gt?.settingsSchema ?? []}
+                                    supportsHeadlessClients={
+                                        gt?.supportsHeadlessClients ?? false
+                                    }
+                                    onDelete={(id) => setDeletingServerId(id)}
+                                />
+                            );
+                        })}
                     </div>
                 )}
             </div>

@@ -35,6 +35,7 @@ type ServerCardProps = {
     presets: ModPreset[];
     gameInstalls: GameInstall[];
     settingsSchema: SettingsSection[];
+    supportsHeadlessClients: boolean;
     onDelete: (id: number) => void;
 };
 
@@ -76,6 +77,7 @@ export default function ServerCard({
     presets,
     gameInstalls,
     settingsSchema,
+    supportsHeadlessClients,
     onDelete,
 }: ServerCardProps) {
     const [showLogs, setShowLogs] = useState(
@@ -85,8 +87,7 @@ export default function ServerCard({
     const [commandText, setCommandText] = useState<string | null>(null);
     const [editing, setEditing] = useState(false);
 
-    const supportsHC =
-        server.game_type === 'arma3' && server.status === 'running';
+    const showHC = supportsHeadlessClients && server.status === 'running';
 
     const loadInitialLogLines = useCallback(async (): Promise<string[]> => {
         const res = await fetch(serverLog.url(server.id));
@@ -264,7 +265,7 @@ export default function ServerCard({
             </div>
 
             {/* Headless client controls */}
-            {supportsHC && <HeadlessClientControls server={server} />}
+            {showHC && <HeadlessClientControls server={server} />}
 
             {/* Log viewer */}
             {showLogs && (
