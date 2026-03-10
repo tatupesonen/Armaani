@@ -9,6 +9,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property GameType $game_type
+ */
 class ModPreset extends Model
 {
     /** @use HasFactory<\Database\Factories\ModPresetFactory> */
@@ -29,16 +32,19 @@ class ModPreset extends Model
         ];
     }
 
+    /** @return BelongsToMany<WorkshopMod, $this> */
     public function mods(): BelongsToMany
     {
         return $this->belongsToMany(WorkshopMod::class, 'mod_preset_workshop_mod');
     }
 
+    /** @return BelongsToMany<ReforgerMod, $this> */
     public function reforgerMods(): BelongsToMany
     {
         return $this->belongsToMany(ReforgerMod::class, 'mod_preset_reforger_mod');
     }
 
+    /** @return HasMany<Server, $this> */
     public function servers(): HasMany
     {
         return $this->hasMany(Server::class, 'active_preset_id');

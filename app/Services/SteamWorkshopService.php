@@ -4,6 +4,9 @@ namespace App\Services;
 
 use App\Enums\GameType;
 use App\Models\SteamAccount;
+use App\Models\WorkshopMod;
+use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 
 class SteamWorkshopService
@@ -32,7 +35,7 @@ class SteamWorkshopService
 
         $formData = ['itemcount' => count($workshopIds)];
 
-        foreach (array_values($workshopIds) as $index => $id) {
+        foreach ($workshopIds as $index => $id) {
             $formData["publishedfileids[{$index}]"] = $id;
         }
 
@@ -91,6 +94,61 @@ class SteamWorkshopService
             'valid' => false,
             'error' => 'HTTP '.$response->status(),
         ];
+    }
+
+    /**
+     * Fetch and sync metadata from the Steam API for a single mod.
+     * Always fetches to keep steam_updated_at current, but only overwrites
+     * name/file_size if they were missing.
+     */
+    public function syncMetadata(WorkshopMod $mod): void
+    {
+        $details = $this->getModDetails($mod->workshop_id);
+
+        if (! $details) {
+            return;
+        }
+
+        $this->applyMetadata($mod, $details);
+    }
+
+    /**
+     * Fetch and sync metadata from the Steam API for multiple mods.
+     *
+     * @param  Collection<int, WorkshopMod>  $mods
+     */
+    public function syncMetadataForMany(Collection $mods): void
+    {
+        $workshopIds = $mods->pluck('workshop_id')->all();
+        $detailsMap = $this->getMultipleModDetails($workshopIds);
+
+        foreach ($mods as $mod) {
+            $details = $detailsMap[$mod->workshop_id] ?? null;
+
+            if ($details) {
+                $this->applyMetadata($mod, $details);
+            }
+        }
+    }
+
+    /**
+     * Apply fetched Steam API metadata to a mod model.
+     *
+     * @param  array{name: string|null, file_size: int|null, time_updated: int|null, game_type: GameType|null}  $details
+     */
+    private function applyMetadata(WorkshopMod $mod, array $details): void
+    {
+        $updates = array_filter([
+            'name' => $mod->name ?? $details['name'],
+            'file_size' => $mod->file_size ?? $details['file_size'],
+            'steam_updated_at' => isset($details['time_updated'])
+                ? Carbon::createFromTimestamp($details['time_updated'])
+                : null,
+        ]);
+
+        if (! empty($updates)) {
+            $mod->update($updates);
+        }
     }
 
     /**

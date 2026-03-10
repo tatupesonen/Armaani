@@ -9,6 +9,10 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property GameType $game_type
+ * @property InstallationStatus $installation_status
+ */
 class GameInstall extends Model
 {
     /** @use HasFactory<\Database\Factories\GameInstallFactory> */
@@ -47,6 +51,7 @@ class GameInstall extends Model
         return $query->where('game_type', $gameType);
     }
 
+    /** @return HasMany<Server, $this> */
     public function servers(): HasMany
     {
         return $this->hasMany(Server::class);

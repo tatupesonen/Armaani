@@ -1,0 +1,28 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: 5
+
+    paths:
+        - app/
+
+    ignoreErrors:
+        # Intentional infinite loop for log tailing command
+        - identifier: while.alwaysTrue
+          path: app/Console/Commands/TailServerLog.php
+        - identifier: deadCode.unreachable
+          path: app/Console/Commands/TailServerLog.php
+
+        # Interface contract requires ?string return type
+        - identifier: return.unusedType
+          path: app/GameHandlers/ReforgerHandler.php
+
+        # Defensive nullsafe access — HasOne relations and static::current() can be null at runtime
+        - identifier: nullsafe.neverNull
+
+        # Process polling loop — correct flow analysis but intentional pattern
+        - identifier: booleanAnd.leftAlwaysTrue
+          path: app/Services/ServerProcessService.php
+        - identifier: if.alwaysTrue
+          path: app/Services/ServerProcessService.php

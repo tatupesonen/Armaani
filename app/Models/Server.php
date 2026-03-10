@@ -4,13 +4,19 @@ namespace App\Models;
 
 use App\Enums\GameType;
 use App\Enums\ServerStatus;
+use App\Events\ServerStatusChanged;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Facades\Log;
 
+/**
+ * @property GameType $game_type
+ * @property ServerStatus $status
+ */
 class Server extends Model
 {
     /** @use HasFactory<\Database\Factories\ServerFactory> */
@@ -60,41 +66,49 @@ class Server extends Model
         ];
     }
 
+    /** @return BelongsTo<ModPreset, $this> */
     public function activePreset(): BelongsTo
     {
         return $this->belongsTo(ModPreset::class, 'active_preset_id');
     }
 
+    /** @return BelongsTo<GameInstall, $this> */
     public function gameInstall(): BelongsTo
     {
         return $this->belongsTo(GameInstall::class);
     }
 
+    /** @return HasOne<DifficultySettings, $this> */
     public function difficultySettings(): HasOne
     {
         return $this->hasOne(DifficultySettings::class);
     }
 
+    /** @return HasOne<NetworkSettings, $this> */
     public function networkSettings(): HasOne
     {
         return $this->hasOne(NetworkSettings::class);
     }
 
+    /** @return HasOne<ReforgerSettings, $this> */
     public function reforgerSettings(): HasOne
     {
         return $this->hasOne(ReforgerSettings::class);
     }
 
+    /** @return HasOne<DayZSettings, $this> */
     public function dayzSettings(): HasOne
     {
         return $this->hasOne(DayZSettings::class);
     }
 
+    /** @return HasMany<ReforgerScenario, $this> */
     public function reforgerScenarios(): HasMany
     {
         return $this->hasMany(ReforgerScenario::class);
     }
 
+    /** @return HasMany<ServerBackup, $this> */
     public function backups(): HasMany
     {
         return $this->hasMany(ServerBackup::class)->latest();
@@ -117,16 +131,21 @@ class Server extends Model
         return config('arma.servers_base_path').'/'.$this->id;
     }
 
-    public function getBinaryPath(): string
+    /**
+     * Transition the server to a new status, broadcast the change, and log it.
+     */
+    public function transitionTo(ServerStatus $status): void
     {
-        return $this->gameInstall->getInstallationPath();
+        $this->update(['status' => $status]);
+        ServerStatusChanged::dispatch($this->id, $status->value, $this->name);
+        Log::info("{$this->logContext()} Status changed to {$status->value}");
     }
 
     /**
-     * Get the Arma 3 profile name used for -name= launch param and profile directories.
+     * Get a formatted log context string for this server.
      */
-    public function getProfileName(): string
+    public function logContext(): string
     {
-        return 'arma3_'.$this->id;
+        return "[Server:{$this->id} '{$this->name}']";
     }
 }

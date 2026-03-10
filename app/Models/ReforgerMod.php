@@ -16,6 +16,7 @@ class ReforgerMod extends Model
         'name',
     ];
 
+    /** @return BelongsToMany<ModPreset, $this> */
     public function presets(): BelongsToMany
     {
         return $this->belongsToMany(ModPreset::class, 'mod_preset_reforger_mod');

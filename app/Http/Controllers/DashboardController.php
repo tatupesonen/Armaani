@@ -61,6 +61,7 @@ class DashboardController extends Controller
 
     private function getModStats(): array
     {
+        /** @var object{total: int|string, installed: int|string, total_size: int|string} $result */
         $result = WorkshopMod::query()
             ->selectRaw('COUNT(*) as total')
             ->selectRaw('SUM(CASE WHEN installation_status = ? THEN 1 ELSE 0 END) as installed', [InstallationStatus::Installed->value])
@@ -136,7 +137,7 @@ class DashboardController extends Controller
             'load_5' => round($loadAvg[1], 2),
             'load_15' => round($loadAvg[2], 2),
             'cores' => $cores,
-            'percent' => $cores > 0 ? round(($loadAvg[0] / $cores) * 100, 1) : 0,
+            'percent' => round(($loadAvg[0] / $cores) * 100, 1),
         ];
     }
 }
