@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\GameType;
 use App\Enums\InstallationStatus;
+use App\GameManager;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -90,7 +91,7 @@ class WorkshopMod extends Model
      */
     public function getInstallationPath(): string
     {
-        $handler = app(\App\GameManager::class)->driver($this->game_type->value);
+        $handler = app(GameManager::class)->driver($this->game_type->value);
 
         return config('arma.mods_base_path').'/steamapps/workshop/content/'.$handler->gameId().'/'.$this->workshop_id;
     }

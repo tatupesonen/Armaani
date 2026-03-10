@@ -67,7 +67,7 @@ class PresetImportService
         $workshopIds = $this->parseHtmlPreset($htmlContent);
         $name = $presetName ?? $this->parsePresetName($htmlContent) ?? 'Imported Preset '.now()->format('Y-m-d H:i');
 
-        $metadataMap = $this->fetchBulkMetadata($workshopIds->all());
+        $metadataMap = $this->steamWorkshopService->getMultipleModDetails($workshopIds->all());
 
         $preset = ModPreset::query()->create([
             'game_type' => GameType::Arma3,
@@ -108,16 +108,5 @@ class PresetImportService
         BatchDownloadModsJob::dispatchInBatches($modsToDownload);
 
         return $preset;
-    }
-
-    /**
-     * Fetch metadata for all workshop IDs in bulk from the Steam API.
-     *
-     * @param  list<int>  $workshopIds
-     * @return array<int, array{name: string|null, file_size: int|null}>
-     */
-    protected function fetchBulkMetadata(array $workshopIds): array
-    {
-        return $this->steamWorkshopService->getMultipleModDetails($workshopIds);
     }
 }

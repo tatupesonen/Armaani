@@ -6,6 +6,7 @@ use App\Contracts\SupportsBackups;
 use App\Contracts\SupportsHeadlessClients;
 use App\Contracts\SupportsMissions;
 use App\Enums\GameType;
+use App\Enums\InstallationStatus;
 use App\Enums\ServerStatus;
 use App\GameManager;
 use App\Http\Requests\Server\StoreServerRequest;
@@ -32,7 +33,6 @@ class ServerController extends Controller
 
     public function index(): Response
     {
-
         $servers = Server::query()
             ->with(['activePreset', 'gameInstall', 'difficultySettings', 'networkSettings', 'reforgerSettings', 'dayzSettings', 'backups'])
             ->orderBy('name')
@@ -47,7 +47,7 @@ class ServerController extends Controller
             'servers' => $servers,
             'presets' => ModPreset::query()->orderBy('name')->get(),
             'gameInstalls' => GameInstall::query()
-                ->whereIn('installation_status', ['installed', 'installing'])
+                ->whereIn('installation_status', [InstallationStatus::Installed, InstallationStatus::Installing])
                 ->orderBy('name')
                 ->get(),
             'gameTypes' => collect(GameType::cases())->map(function (GameType $gt) {

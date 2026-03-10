@@ -129,7 +129,7 @@ class BatchDownloadModsJob implements ShouldQueue
         }
 
         if ($result->successful()) {
-            $this->processSuccessfulBatch();
+            $this->processSuccessfulBatch($handler);
         } else {
             $this->processFailedBatch($result->errorOutput());
         }
@@ -148,10 +148,8 @@ class BatchDownloadModsJob implements ShouldQueue
     /**
      * Process all mods after a successful SteamCMD batch download.
      */
-    private function processSuccessfulBatch(): void
+    private function processSuccessfulBatch(\App\Contracts\GameHandler $handler): void
     {
-        $handler = app(GameManager::class)->driver($this->mods->first()->game_type->value);
-
         foreach ($this->mods as $mod) {
             $modPath = $mod->getInstallationPath();
 

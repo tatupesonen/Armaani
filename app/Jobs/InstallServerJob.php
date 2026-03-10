@@ -88,13 +88,13 @@ class InstallServerJob implements ShouldQueue
                 'installed_at' => now(),
             ]);
 
-            Log::info("Game install '{$this->gameInstall->name}' completed successfully (disk: {$diskSize} bytes, build: {$buildId})");
+            Log::info("{$context} Completed successfully (disk: {$diskSize} bytes, build: {$buildId})");
 
             GameInstallOutput::dispatch($this->gameInstall->id, 100, 'Installation completed successfully.');
         } else {
             $this->gameInstall->update(['installation_status' => InstallationStatus::Failed]);
 
-            Log::error("Game installation failed for '{$this->gameInstall->name}': {$result->errorOutput()}");
+            Log::error("{$context} Installation failed: {$result->errorOutput()}");
 
             GameInstallOutput::dispatch($this->gameInstall->id, 0, 'Installation failed: '.$result->errorOutput());
 

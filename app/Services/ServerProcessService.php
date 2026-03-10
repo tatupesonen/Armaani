@@ -95,10 +95,10 @@ class ServerProcessService
             Log::info("{$server->logContext()} Stopping server (PID {$pid})");
             posix_kill($pid, SIGTERM);
 
-            $waited = 0;
-            while ($this->isProcessRunning($pid) && $waited < 15) {
-                usleep(500000);
-                $waited++;
+            $attempts = 0;
+            while ($this->isProcessRunning($pid) && $attempts < 15) {
+                usleep(500_000);
+                $attempts++;
             }
 
             if ($this->isProcessRunning($pid)) {
@@ -292,13 +292,8 @@ class ServerProcessService
 
     protected function startHeadlessClient(Server $server, int $index): void
     {
+        /** @var SupportsHeadlessClients $handler */
         $handler = $this->gameManager->for($server);
-
-        if (! $handler instanceof SupportsHeadlessClients) {
-            Log::warning("{$server->logContext()} Game type does not support headless clients");
-
-            return;
-        }
 
         $context = "{$server->logContext()} HC:{$index}";
         $binaryDir = $server->gameInstall->getInstallationPath();

@@ -11,6 +11,7 @@ use App\Enums\GameType;
 use App\GameHandlers\ReforgerHandler;
 use App\Models\ModPreset;
 use App\Models\ReforgerMod;
+use App\Models\Server;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
 use Tests\Concerns\CreatesGameScenarios;
@@ -165,15 +166,7 @@ class ReforgerHandlerTest extends TestCase
             'max_players' => 64,
         ]);
 
-        $profilesPath = $server->getProfilesPath();
-        @mkdir($profilesPath, 0755, true);
-
-        $this->handler->generateConfigFiles($server);
-
-        $configPath = $profilesPath.'/REFORGER_'.$server->id.'.json';
-        $this->assertFileExists($configPath);
-
-        $config = json_decode(file_get_contents($configPath), true);
+        $config = $this->generateAndReadConfig($server);
         $this->assertEquals('', $config['bindAddress']);
         $this->assertEquals($server->port, $config['bindPort']);
         $this->assertEquals('', $config['publicAddress']);
@@ -203,13 +196,7 @@ class ReforgerHandlerTest extends TestCase
         $server->reforgerSettings()->update(['cross_platform' => true]);
         $server->refresh();
 
-        $profilesPath = $server->getProfilesPath();
-        @mkdir($profilesPath, 0755, true);
-
-        $this->handler->generateConfigFiles($server);
-
-        $configPath = $profilesPath.'/REFORGER_'.$server->id.'.json';
-        $config = json_decode(file_get_contents($configPath), true);
+        $config = $this->generateAndReadConfig($server);
         $this->assertTrue($config['game']['crossPlatform']);
     }
 
@@ -217,13 +204,7 @@ class ReforgerHandlerTest extends TestCase
     {
         $server = $this->createReforgerServer();
 
-        $profilesPath = $server->getProfilesPath();
-        @mkdir($profilesPath, 0755, true);
-
-        $this->handler->generateConfigFiles($server);
-
-        $configPath = $profilesPath.'/REFORGER_'.$server->id.'.json';
-        $config = json_decode(file_get_contents($configPath), true);
+        $config = $this->generateAndReadConfig($server);
         $this->assertFalse($config['game']['crossPlatform']);
     }
 
@@ -233,13 +214,7 @@ class ReforgerHandlerTest extends TestCase
         $server->reforgerSettings()->update(['third_person_view_enabled' => false]);
         $server->refresh();
 
-        $profilesPath = $server->getProfilesPath();
-        @mkdir($profilesPath, 0755, true);
-
-        $this->handler->generateConfigFiles($server);
-
-        $configPath = $profilesPath.'/REFORGER_'.$server->id.'.json';
-        $config = json_decode(file_get_contents($configPath), true);
+        $config = $this->generateAndReadConfig($server);
         $this->assertTrue($config['game']['gameProperties']['disableThirdPerson']);
     }
 
@@ -256,13 +231,7 @@ class ReforgerHandlerTest extends TestCase
         $server->update(['active_preset_id' => $preset->id]);
         $server->load('activePreset.reforgerMods');
 
-        $profilesPath = $server->getProfilesPath();
-        @mkdir($profilesPath, 0755, true);
-
-        $this->handler->generateConfigFiles($server);
-
-        $configPath = $profilesPath.'/REFORGER_'.$server->id.'.json';
-        $config = json_decode(file_get_contents($configPath), true);
+        $config = $this->generateAndReadConfig($server);
 
         $this->assertCount(2, $config['game']['mods']);
         $this->assertEquals('AAAA1111BBBB2222', $config['game']['mods'][0]['modId']);
@@ -277,13 +246,7 @@ class ReforgerHandlerTest extends TestCase
         $server->update(['active_preset_id' => null]);
         $server->refresh();
 
-        $profilesPath = $server->getProfilesPath();
-        @mkdir($profilesPath, 0755, true);
-
-        $this->handler->generateConfigFiles($server);
-
-        $configPath = $profilesPath.'/REFORGER_'.$server->id.'.json';
-        $config = json_decode(file_get_contents($configPath), true);
+        $config = $this->generateAndReadConfig($server);
 
         $this->assertEmpty($config['game']['mods']);
     }
@@ -294,6 +257,24 @@ class ReforgerHandlerTest extends TestCase
 
         $this->assertContains('required', $rules['scenario_id']);
         $this->assertContains('string', $rules['scenario_id']);
+    }
+
+    /**
+     * Generate config files for a server and return the parsed JSON config.
+     *
+     * @return array<string, mixed>
+     */
+    private function generateAndReadConfig(Server $server): array
+    {
+        $profilesPath = $server->getProfilesPath();
+        @mkdir($profilesPath, 0755, true);
+
+        $this->handler->generateConfigFiles($server);
+
+        $configPath = $profilesPath.'/REFORGER_'.$server->id.'.json';
+        $this->assertFileExists($configPath);
+
+        return json_decode(file_get_contents($configPath), true);
     }
 
     public function test_create_related_settings_creates_reforger_settings(): void

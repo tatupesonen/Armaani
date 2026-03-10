@@ -13,6 +13,7 @@ use App\Jobs\StopServerJob;
 use App\Models\Server;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class DetectServerEvents
 {
@@ -61,7 +62,7 @@ class DetectServerEvents
 
         // Check for boot detection (Booting/DownloadingMods → Running)
         $bootStrings = $handler->getBootDetectionStrings();
-        if ($bootStrings !== [] && $this->lineContainsAny($event->line, $bootStrings)) {
+        if ($bootStrings !== [] && Str::contains($event->line, $bootStrings)) {
             $this->transitionStatus($server, [ServerStatus::Booting, ServerStatus::DownloadingMods], ServerStatus::Running);
 
             return;
@@ -69,7 +70,7 @@ class DetectServerEvents
 
         // Check for crash detection (Running/Booting/DownloadingMods → Crashed)
         $crashStrings = $handler->getCrashDetectionStrings();
-        if ($crashStrings !== [] && $this->lineContainsAny($event->line, $crashStrings)) {
+        if ($crashStrings !== [] && Str::contains($event->line, $crashStrings)) {
             $transitioned = $this->transitionStatus(
                 $server,
                 [ServerStatus::Running, ServerStatus::Booting, ServerStatus::DownloadingMods],
@@ -117,21 +118,5 @@ class DetectServerEvents
         ServerStatusChanged::dispatch($server->id, $toStatus->value, $server->name);
 
         return true;
-    }
-
-    /**
-     * Check if the line contains any of the given strings.
-     *
-     * @param  array<int, string>  $needles
-     */
-    private function lineContainsAny(string $line, array $needles): bool
-    {
-        foreach ($needles as $needle) {
-            if (str_contains($line, $needle)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 }

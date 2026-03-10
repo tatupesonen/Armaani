@@ -80,20 +80,17 @@ final class ReforgerHandler implements DetectsServerState, GameHandler
     {
         $settings = $server->reforgerSettings;
 
-        $mods = [];
         $preset = $server->activePreset;
 
-        if ($preset) {
-            foreach ($preset->reforgerMods as $mod) {
-                $mods[] = [
-                    'modId' => $mod->mod_id,
-                    'name' => $mod->name,
-                ];
-            }
-        }
+        $mods = $preset
+            ? $preset->reforgerMods->map(fn ($mod) => [
+                'modId' => $mod->mod_id,
+                'name' => $mod->name,
+            ])->all()
+            : [];
 
-        $thirdPersonEnabled = (bool) ($settings?->third_person_view_enabled ?? true);
-        $crossPlatform = (bool) ($settings?->cross_platform ?? false);
+        $thirdPersonEnabled = $settings?->third_person_view_enabled ?? true;
+        $crossPlatform = $settings?->cross_platform ?? false;
 
         $config = [
             'bindAddress' => '',
@@ -114,7 +111,7 @@ final class ReforgerHandler implements DetectsServerState, GameHandler
                     'networkViewDistance' => 1000,
                     'disableThirdPerson' => ! $thirdPersonEnabled,
                     'fastValidation' => true,
-                    'battlEye' => (bool) $server->battle_eye,
+                    'battlEye' => $server->battle_eye,
                     'VONDisableUI' => true,
                     'VONDisableDirectSpeechUI' => true,
                 ],

@@ -65,10 +65,12 @@ class GameManager extends Manager
 
             $attributes = (new ReflectionClass($class))->getAttributes(HandlesGame::class);
 
-            if (! empty($attributes)) {
-                $gameType = $attributes[0]->newInstance()->gameType;
-                $this->handlerMap[$gameType->value] = $class;
+            if ($attributes === []) {
+                continue;
             }
+
+            $gameType = $attributes[0]->newInstance()->gameType;
+            $this->handlerMap[$gameType->value] = $class;
         }
 
         return $this->handlerMap;
