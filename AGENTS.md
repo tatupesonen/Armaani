@@ -125,6 +125,7 @@ This project has domain-specific skills available. You MUST activate the relevan
 - Use appropriate PHP type hints for method parameters.
 
 <!-- Explicit Return Types and Method Params -->
+
 ```php
 protected function isAccessible(User $user, ?string $path = null): bool
 {
@@ -303,7 +304,7 @@ Wayfinder generates TypeScript functions for Laravel routes. Import from `@/acti
 
 ## Project Overview
 
-Armaani is a web-based game server manager built with Laravel 12, Inertia v2, React 19, and Tailwind CSS v4. It supports Arma 3, Arma Reforger, and DayZ (scaffolded). It allows users to install, configure, and manage multiple server instances (including starting/stopping/restarting processes), download Steam Workshop mods via SteamCMD, organize mods into presets, import Arma 3 Launcher HTML preset files, and assign presets to server instances. Game-specific logic is handled by the GameHandler pattern (Manager pattern). The application supports dynamic headless client management (Arma 3), server difficulty settings, and profile backup/restore. It ships as a single Docker container with SteamCMD bundled inside.
+Armaani is a web-based game server manager built with Laravel 12, Inertia v2, React 19, and Tailwind CSS v4. It supports Arma 3, Arma Reforger, Project Zomboid, and DayZ (scaffolded). It allows users to install, configure, and manage multiple server instances (including starting/stopping/restarting processes), download Steam Workshop mods via SteamCMD, organize mods into presets, import Arma 3 Launcher HTML preset files, and assign presets to server instances. Game-specific logic is handled by the GameHandler pattern (Manager pattern). The application supports dynamic headless client management (Arma 3), server difficulty settings, and profile backup/restore. It ships as a single Docker container with SteamCMD bundled inside.
 
 ## Static Analysis
 
@@ -321,12 +322,12 @@ Armaani is a web-based game server manager built with Laravel 12, Inertia v2, Re
 
 ## Scope
 
-- **Multi-game support** — Arma 3 (full), Arma Reforger (full), DayZ (scaffolded — throws RuntimeException for unimplemented features).
+- **Multi-game support** — Arma 3 (full), Arma Reforger (full), Project Zomboid (full), DayZ (scaffolded — throws RuntimeException for unimplemented features).
 - Game-specific logic isolated into handler classes via the `GameManager` (Laravel Manager pattern).
 - Full server process control (start/stop/restart) from the web UI via queued jobs.
 - Dynamic headless client support (Arma 3 only, max 10).
 - Arma 3 Launcher HTML preset import supported.
-- Per-game server settings: difficulty (Arma 3), network (Arma 3), Reforger settings, DayZ settings.
+- Per-game server settings: difficulty (Arma 3), network (Arma 3), Reforger settings, Project Zomboid settings, DayZ settings.
 - `.vars.Arma3Profile` backup and restore (Arma 3 only).
 
 ## UI Patterns
@@ -436,6 +437,7 @@ The toast system (`resources/js/components/toast-manager.tsx`) handles:
 - `Server` — name, port, query_port, max_players, password, admin_password, description, active_preset_id, game_install_id, game_type, status, additional_params, verify_signatures, allowed_file_patching, battle_eye, persistent, von_enabled, additional_server_options
 - `DifficultySettings` — per-server Arma 3 difficulty options (one-to-one with Server)
 - `ReforgerSettings` — per-server Reforger options (scenario_id, third_person_view_enabled)
+- `ProjectZomboidSettings` — per-server PZ options (pvp, pause_empty, global_chat, map, safety_system, sleep, etc.)
 - `DayZSettings` — per-server DayZ options (uses `$table = 'dayz_settings'`)
 - `ServerBackup` — server_id, name, file_size, is_automatic, data
 - `WorkshopMod` — workshop_id, name, file_size, installation_status, progress_pct, installed_at, game_type
@@ -471,13 +473,14 @@ The toast system (`resources/js/components/toast-manager.tsx`) handles:
 - `app/Providers/GameServiceProvider.php` — Auto-discovers handler classes via glob and registers them with `GameManager::extend()`. Supports a cached manifest at `bootstrap/cache/game-handlers.php` via `game-handlers:cache` / `game-handlers:clear` artisan commands, integrated with `php artisan optimize`.
 - `app/GameHandlers/Arma3Handler.php` — Full implementation (~510 lines); implements `GameHandler` + `SteamGameHandler`; generates server.cfg, server_basic.cfg, .Arma3Profile
 - `app/GameHandlers/ReforgerHandler.php` — Full implementation; implements `GameHandler` + `SteamGameHandler`; generates JSON config
+- `app/GameHandlers/ProjectZomboidHandler.php` — Full implementation; implements `GameHandler` + `SteamGameHandler` + `DetectsServerState`; generates INI config via Twig; PZ auto-expands partial INI on first boot
 - `app/GameHandlers/DayZHandler.php` — Scaffold; implements `GameHandler` + `SteamGameHandler`; throws RuntimeException for unimplemented features
 
 ### Services
 
 - `app/Services/SteamCmdService.php` — SteamCMD process management, `stripAnsi()` for ANSI code stripping
 - `app/Services/SteamWorkshopService.php` — Steam API integration for mod metadata and API key validation
-- `app/Services/ServerProcessService.php` — Server lifecycle orchestrator (~320 lines), delegates to GameHandler
+- `app/Services/Server/ServerProcessService.php` — Server lifecycle orchestrator (~440 lines), delegates to GameHandler. Uses `killProcessTree()` (recursive `pgrep -P`) to kill child processes for wrapper-script games (e.g., PZ's `start-server.sh` → Java). Log tail continues until process is fully dead so shutdown logs stream to UI.
 - `app/Services/ServerBackupService.php` — Backup CRUD + pruning
 - `app/Services/PresetImportService.php` — HTML preset parsing + batched download dispatch
 
@@ -556,7 +559,7 @@ Form Request conventions: array-based validation rules, no `authorize()` method 
 
 ### Test Traits
 
-- `tests/Concerns/CreatesGameScenarios.php` — `createServer(string $gameType)`, `createArma3Server()`, `createReforgerServer()`, `createDayZServer()`
+- `tests/Concerns/CreatesGameScenarios.php` — `createServer(string $gameType)`, `createArma3Server()`, `createReforgerServer()`, `createProjectZomboidServer()`, `createDayZServer()`
 - `tests/Concerns/MocksGameManager.php` — mock GameManager singleton
 - `tests/Concerns/MocksServerProcessService.php` — mock ServerProcessService with configurable status
 - `tests/Concerns/MocksSteamCmdProcess.php` — `makeInvokedProcess(bool): InvokedProcess`
@@ -571,7 +574,7 @@ Form Request conventions: array-based validation rules, no `authorize()` method 
 - `SteamWorkshopService::validateApiKey()` returns `array{valid: bool, error: string|null}`.
 - Streamed downloads use `$response->streamedContent()` not `$response->getContent()`.
 
-### Test Files (386 tests total across 32 files)
+### Test Files (518 tests total across 33 files)
 
 - `tests/Feature/DashboardTest.php` — 10 tests
 - `tests/Feature/ExampleTest.php` — 1 test
@@ -584,6 +587,7 @@ Form Request conventions: array-based validation rules, no `authorize()` method 
 - `tests/Feature/Auth/VerificationNotificationTest.php` — 2 tests
 - `tests/Feature/Events/BroadcastEventsTest.php` — 9 tests
 - `tests/Feature/GameHandlers/DayZHandlerTest.php` — 14 tests
+- `tests/Feature/GameHandlers/ProjectZomboidHandlerTest.php` — 37 tests
 - `tests/Feature/GameHandlers/ReforgerHandlerTest.php` — 23 tests
 - `tests/Feature/GameInstalls/GameInstallManagementTest.php` — 8 tests
 - `tests/Feature/Jobs/BatchDownloadModsJobTest.php` — 8 tests
@@ -617,9 +621,10 @@ Form Request conventions: array-based validation rules, no `authorize()` method 
 
 ## Docker Deployment
 
-- Single container based on `cm2network/steamcmd` with PHP 8.4 FPM/CLI, Nginx, SteamCMD, Supervisor, SQLite.
+- Single container based on `cm2network/steamcmd` with PHP 8.5 FPM/CLI, Caddy, SteamCMD, Supervisor, SQLite.
+- `procps` package installed for `pgrep` (required by `killProcessTree()` in `ServerProcessService`).
 - `network_mode: host` for dynamic game server ports.
 - Single volume: `./storage:/var/www/html/storage`
-- Supervisord manages: Nginx, PHP-FPM, queue worker, Reverb (127.0.0.1:6001).
-- Nginx reverse-proxies `/app` and `/apps` to Reverb — no second external port needed.
+- Supervisord manages: Caddy, PHP-FPM, queue worker, Reverb (127.0.0.1:6001).
+- Caddy reverse-proxies `/app` and `/apps` to Reverb — no second external port needed.
 - `APP_KEY` and `REVERB_APP_SECRET` auto-generated and persisted to storage volume.

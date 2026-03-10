@@ -27,6 +27,8 @@ Before implementing a game handler, **research the game's dedicated server onlin
 - Whether it supports Steam Workshop mods
 - Whether it has GUID-based registered mods (like Reforger)
 - Whether it has discoverable scenarios/missions
+- **Whether the server binary is a wrapper script** (e.g., PZ's `start-server.sh` wraps Java) — affects process management
+- **Whether the server requires interactive input on first run** (e.g., PZ prompts for admin password via stdin) — must be handled via launch flags instead
 
 Use this research to populate the handler's methods and create accurate config templates.
 
@@ -309,27 +311,30 @@ The `formField` key must exactly match the field name expected by the backend va
 
 ## Existing Handlers (Reference)
 
-| Handler           | Game          | Complexity | Best Reference For                                               |
-| ----------------- | ------------- | ---------- | ---------------------------------------------------------------- |
-| `DayZHandler`     | DayZ          | Simplest   | Minimal scaffold, unimplemented methods throw `RuntimeException` |
-| `ReforgerHandler` | Arma Reforger | Medium     | JSON config, registered mods, scenarios, custom component        |
-| `Arma3Handler`    | Arma 3        | Full       | Twig templates, complex settings schema, headless clients        |
+| Handler                 | Game            | Complexity | Best Reference For                                               |
+| ----------------------- | --------------- | ---------- | ---------------------------------------------------------------- |
+| `DayZHandler`           | DayZ            | Simplest   | Minimal scaffold, unimplemented methods throw `RuntimeException` |
+| `ReforgerHandler`       | Arma Reforger   | Medium     | JSON config, registered mods, scenarios, custom component        |
+| `ProjectZomboidHandler` | Project Zomboid | Full       | Twig INI templates, DetectsServerState, wrapper-script games     |
+| `Arma3Handler`          | Arma 3          | Full       | Twig templates, complex settings schema, headless clients        |
 
 ## Post-Creation Checklist
 
 After scaffolding a handler:
 
 1. Set Steam App IDs (look up on SteamDB)
-2. Implement `buildLaunchCommand()` and `getBinaryPath()` based on the game's docs
-3. Create config templates in `resources/templates/configs/{game}/`
-4. Define `settingsSchema()` for the server settings UI
-5. Fill in `settingsValidationRules()` matching the schema fields
-6. Run `php artisan game:generate-types` to update TypeScript types
-7. If settings model was generated, add columns to the migration and run `php artisan migrate`
-8. Write tests (use `tests/Concerns/CreatesGameScenarios.php` trait — add a `create{Game}Server()` method)
-9. Run `vendor/bin/pint --dirty --format agent`
-10. Run `vendor/bin/phpstan analyse --memory-limit=512M`
-11. Run `php artisan test --compact`
+2. Verify the server binary is a direct executable vs. a wrapper script (check if it's a shell script that spawns another process)
+3. Check if the server requires interactive input on first run (e.g., admin password prompts) and handle via launch flags
+4. Implement `buildLaunchCommand()` and `getBinaryPath()` based on the game's docs
+5. Create config templates in `resources/templates/configs/{game}/`
+6. Define `settingsSchema()` for the server settings UI
+7. Fill in `settingsValidationRules()` matching the schema fields
+8. Run `php artisan game:generate-types` to update TypeScript types
+9. If settings model was generated, add columns to the migration and run `php artisan migrate`
+10. Write tests (use `tests/Concerns/CreatesGameScenarios.php` trait — add a `create{Game}Server()` method)
+11. Run `vendor/bin/pint --dirty --format agent`
+12. Run `vendor/bin/phpstan analyse --memory-limit=512M`
+13. Run `php artisan test --compact`
 
 ## Common Pitfalls
 
@@ -337,3 +342,7 @@ After scaffolding a handler:
 - Using `formField` values that don't match backend validation rule keys (causes silent form submission failures)
 - Forgetting to run `game:generate-types` after changing a handler (TypeScript types will be stale)
 - Not researching the actual game server configuration format before writing templates
+- **Wrapper-script servers** — Some games (e.g., Project Zomboid) use a shell script that spawns a child process (Java, Mono, etc.). `ServerProcessService::killProcessTree()` handles this by recursively killing children via `pgrep -P`, but the Docker container must have the `procps` package installed for `pgrep` to be available
+- **Interactive stdin prompts** — Some servers prompt for input on first run (e.g., PZ admin password). Since the process runs detached with `/dev/null` as stdin, this causes a crash. Pass required values as launch flags instead (e.g., `-adminpassword`)
+- **Config auto-expansion** — Some games (e.g., Project Zomboid) auto-expand partial config files with all default values on first boot. The Twig template only needs to set managed values; the game fills in the rest. Don't try to template every possible setting
+- **Invalid launch flags** — Not all parameters documented online are valid launch flags. Some settings (like IP binding in PZ) must be set in the config file, not on the command line. Test launch commands against actual server behavior

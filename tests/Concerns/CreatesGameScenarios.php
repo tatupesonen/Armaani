@@ -39,4 +39,9 @@ trait CreatesGameScenarios
     {
         return $this->createServer('dayz', $overrides);
     }
+
+    protected function createProjectZomboidServer(array $overrides = []): Server
+    {
+        return $this->createServer('projectzomboid', $overrides);
+    }
 }

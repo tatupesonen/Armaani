@@ -21,8 +21,4 @@ parameters:
         # Defensive nullsafe access — HasOne relations and static::current() can be null at runtime
         - identifier: nullsafe.neverNull
 
-        # Process polling loop — correct flow analysis but intentional pattern
-        - identifier: booleanAnd.leftAlwaysTrue
-          path: app/Services/Server/ServerProcessService.php
-        - identifier: if.alwaysTrue
-          path: app/Services/Server/ServerProcessService.php
+

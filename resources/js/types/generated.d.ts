@@ -76,6 +76,25 @@ export type Arma3Settings = {
     terrain_grid: string;
 };
 
+export type ProjectzomboidSettings = {
+    id: number;
+    server_id: number;
+    open: boolean;
+    pvp: boolean;
+    pause_empty: boolean;
+    global_chat: boolean;
+    safety_system: boolean;
+    show_safety: boolean;
+    map: string;
+    sleep_allowed: boolean;
+    sleep_needed: boolean;
+    announce_death: boolean;
+    do_lua_checksum: boolean;
+    max_accounts_per_user: number;
+    login_queue_enabled: boolean;
+    deny_login_on_overloaded_server: boolean;
+};
+
 export type ReforgerSettings = {
     id: number;
     server_id: number;
@@ -94,9 +113,14 @@ export type DayzServer = ServerBase & {
     game_type: 'dayz';
 };
 
+export type ProjectzomboidServer = ServerBase & {
+    game_type: 'projectzomboid';
+    projectzomboid_settings?: ProjectzomboidSettings;
+};
+
 export type ReforgerServer = ServerBase & {
     game_type: 'reforger';
     reforger_settings?: ReforgerSettings;
 };
 
-export type Server = Arma3Server | DayzServer | ReforgerServer;
+export type Server = Arma3Server | DayzServer | ProjectzomboidServer | ReforgerServer;

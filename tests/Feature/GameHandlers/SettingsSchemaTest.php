@@ -348,7 +348,7 @@ class SettingsSchemaTest extends TestCase
             ->assertInertia(
                 fn (Assert $page) => $page
                     ->component('servers/index')
-                    ->has('gameTypes', 3)
+                    ->has('gameTypes', 4)
                     ->has(
                         'gameTypes.0',
                         fn (Assert $gt) => $gt
@@ -365,6 +365,13 @@ class SettingsSchemaTest extends TestCase
                     )
                     ->has(
                         'gameTypes.2',
+                        fn (Assert $gt) => $gt
+                            ->has('settingsSchema')
+                            ->where('value', 'projectzomboid')
+                            ->etc()
+                    )
+                    ->has(
+                        'gameTypes.3',
                         fn (Assert $gt) => $gt
                             ->has('settingsSchema')
                             ->where('value', 'reforger')
@@ -398,7 +405,7 @@ class SettingsSchemaTest extends TestCase
             ->assertInertia(
                 fn (Assert $page) => $page
                     ->has(
-                        'gameTypes.2',
+                        'gameTypes.3',
                         fn (Assert $gt) => $gt
                             ->where('value', 'reforger')
                             ->has('settingsSchema', 1) // Reforger Settings

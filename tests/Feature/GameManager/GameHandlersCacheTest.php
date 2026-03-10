@@ -92,7 +92,7 @@ class GameHandlersCacheTest extends TestCase
     {
         $handlers = GameServiceProvider::discoverHandlers();
 
-        $this->assertCount(3, $handlers);
+        $this->assertCount(4, $handlers);
 
         foreach ($handlers as $key => $class) {
             $this->assertIsString($key);

@@ -26,6 +26,7 @@ RUN apt-get update \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
         caddy \
+        procps \
         supervisor \
         # PHP FPM + CLI (php8.5-common is auto-installed and includes
         # opcache, pcntl, pdo, tokenizer, fileinfo, sockets, etc.)

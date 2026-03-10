@@ -87,13 +87,11 @@ class ServerProcessService
      */
     public function stop(Server $server): void
     {
-        $this->stopLogTail($server);
-
         $pid = $this->getPid($server);
 
         if ($pid && $this->isProcessRunning($pid)) {
             Log::info("{$server->logContext()} Stopping server (PID {$pid})");
-            posix_kill($pid, SIGTERM);
+            $this->killProcessTree($pid, SIGTERM);
 
             $attempts = 0;
             while ($this->isProcessRunning($pid) && $attempts < 15) {
@@ -103,7 +101,7 @@ class ServerProcessService
 
             if ($this->isProcessRunning($pid)) {
                 Log::warning("{$server->logContext()} Server did not stop gracefully, sending SIGKILL (PID {$pid})");
-                posix_kill($pid, SIGKILL);
+                $this->killProcessTree($pid, SIGKILL);
             }
 
             Log::info("{$server->logContext()} Server stopped");
@@ -111,6 +109,7 @@ class ServerProcessService
             Log::info("{$server->logContext()} Server was not running (no active PID)");
         }
 
+        $this->stopLogTail($server);
         $this->cleanupPidFile($server);
     }
 
@@ -377,6 +376,24 @@ class ServerProcessService
     protected function isProcessRunning(int $pid): bool
     {
         return posix_kill($pid, 0);
+    }
+
+    /**
+     * Send a signal to a process and all its descendants.
+     *
+     * Game servers launched via wrapper scripts (e.g. Project Zomboid's start-server.sh)
+     * spawn child processes. Killing only the parent leaves children orphaned.
+     */
+    protected function killProcessTree(int $pid, int $signal): void
+    {
+        $childPids = [];
+        exec("pgrep -P {$pid}", $childPids);
+
+        foreach ($childPids as $childPid) {
+            $this->killProcessTree((int) $childPid, $signal);
+        }
+
+        posix_kill($pid, $signal);
     }
 
     protected function getPidFilePath(Server $server): string

@@ -66,4 +66,9 @@ class GameInstallFactory extends Factory
     {
         return $this->forGame('dayz');
     }
+
+    public function projectZomboid(): static
+    {
+        return $this->forGame('projectzomboid');
+    }
 }
