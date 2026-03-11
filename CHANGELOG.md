@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.2](https://github.com/tatupesonen/Armaani/compare/v1.8.1...v1.8.2) (2026-03-11)
+
+
+### Bug Fixes
+
+* allow empty scenario ID on Reforger server creation ([ec57fd1](https://github.com/tatupesonen/Armaani/commit/ec57fd190c00eb4834fc3bd57abccea3a952ca78))
+
 ## [1.8.1](https://github.com/tatupesonen/Armaani/compare/v1.8.0...v1.8.1) (2026-03-11)
 
 
