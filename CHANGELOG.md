@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.8.1](https://github.com/tatupesonen/Armaani/compare/v1.8.0...v1.8.1) (2026-03-11)
+
+
+### Bug Fixes
+
+* add query_port to Reforger and Project Zomboid settings schema ([b657e44](https://github.com/tatupesonen/Armaani/commit/b657e44301b939ec3039da441b286d676e00a45e))
+* add query_port to Reforger and Project Zomboid settings schema ([af27c01](https://github.com/tatupesonen/Armaani/commit/af27c01cc85275651b2078c54db73a13b10b2acf))
+
 ## [1.8.0](https://github.com/tatupesonen/Armaani/compare/v1.7.1...v1.8.0) (2026-03-11)
 
 
