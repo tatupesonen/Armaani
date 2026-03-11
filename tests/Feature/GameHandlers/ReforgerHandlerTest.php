@@ -255,11 +255,11 @@ class ReforgerHandlerTest extends TestCase
         $this->assertEmpty($config['game']['mods']);
     }
 
-    public function test_settings_validation_rules_require_valid_scenario_id(): void
+    public function test_settings_validation_rules_allow_nullable_scenario_id(): void
     {
         $rules = $this->handler->settingsValidationRules();
 
-        $this->assertContains('required', $rules['scenario_id']);
+        $this->assertContains('nullable', $rules['scenario_id']);
         $this->assertContains('string', $rules['scenario_id']);
     }
 

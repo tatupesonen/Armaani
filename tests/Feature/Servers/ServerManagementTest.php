@@ -341,6 +341,27 @@ class ServerManagementTest extends TestCase
         $this->assertEquals('{ECC61978EDCC2B5A}Missions/23_Campaign.conf', $server->reforgerSettings->scenario_id);
     }
 
+    public function test_create_reforger_server_without_scenario_id(): void
+    {
+        $reforgerInstall = GameInstall::factory()->installed()->reforger()->create();
+
+        $this->actingAs($this->user)
+            ->post(route('servers.store'), [
+                'game_type' => 'reforger',
+                'name' => 'Reforger No Scenario',
+                'port' => 2001,
+                'max_players' => 32,
+                'game_install_id' => $reforgerInstall->id,
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $server = Server::query()->where('name', 'Reforger No Scenario')->first();
+        $this->assertNotNull($server);
+        $this->assertNotNull($server->reforgerSettings);
+        $this->assertNull($server->reforgerSettings->scenario_id);
+    }
+
     // ---------------------------------------------------------------
     // Update
     // ---------------------------------------------------------------
@@ -532,7 +553,7 @@ class ServerManagementTest extends TestCase
             ->assertSessionHasErrors(['scenario_id']);
     }
 
-    public function test_update_reforger_server_rejects_empty_scenario_id(): void
+    public function test_update_reforger_server_allows_empty_scenario_id(): void
     {
         $server = Server::factory()->forReforger()->create();
         $server->reforgerSettings()->create([]);
@@ -547,7 +568,8 @@ class ServerManagementTest extends TestCase
                 'scenario_id' => '',
                 'third_person_view_enabled' => true,
             ])
-            ->assertSessionHasErrors(['scenario_id']);
+            ->assertRedirect()
+            ->assertSessionHas('success');
     }
 
     // ---------------------------------------------------------------

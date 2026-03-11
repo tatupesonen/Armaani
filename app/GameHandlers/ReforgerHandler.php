@@ -224,7 +224,7 @@ final class ReforgerHandler implements DetectsServerState, GameHandler, SteamGam
     public function settingsValidationRules(): array
     {
         return [
-            'scenario_id' => ['required', 'string', 'regex:/^\{[0-9A-F]{16}\}[a-zA-Z0-9_.\/ -]+$/'],
+            'scenario_id' => ['nullable', 'string', 'regex:/^\{[0-9A-F]{16}\}[a-zA-Z0-9_.\/ -]+$/'],
             'third_person_view_enabled' => ['boolean'],
             'max_fps' => ['integer', 'min:10', 'max:240'],
             'cross_platform' => ['boolean'],
