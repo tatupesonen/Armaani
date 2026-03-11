@@ -62,10 +62,12 @@ class MissionController extends Controller
     {
         $path = $this->resolveSecureMissionPath($filename);
 
-        if ($path !== null) {
-            unlink($path);
-            Log::info(auth_context().' deleted mission: '.basename($path));
+        if ($path === null) {
+            return back()->with('error', 'Mission file not found.');
         }
+
+        unlink($path);
+        Log::info(auth_context().' deleted mission: '.basename($path));
 
         return back()->with('success', 'Mission file deleted.');
     }

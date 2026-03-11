@@ -108,7 +108,7 @@ class ServerController extends Controller
 
     public function destroy(Server $server): RedirectResponse
     {
-        if ($server->status !== ServerStatus::Stopped) {
+        if (! $server->status->isDeletable()) {
             return back()->with('error', 'Cannot delete a running server. Stop it first.');
         }
 
@@ -121,7 +121,7 @@ class ServerController extends Controller
 
     public function start(Server $server): RedirectResponse
     {
-        if (! in_array($server->status, [ServerStatus::Stopped, ServerStatus::Crashed])) {
+        if (! $server->status->isStartable()) {
             return back()->with('error', 'Server can only be started when stopped or crashed.');
         }
 
@@ -136,8 +136,8 @@ class ServerController extends Controller
 
     public function stop(Server $server): RedirectResponse
     {
-        if (! in_array($server->status, [ServerStatus::Running, ServerStatus::Booting])) {
-            return back()->with('error', 'Server can only be stopped when running or booting.');
+        if (! $server->status->isStoppable()) {
+            return back()->with('error', 'Server can only be stopped when running, booting, or downloading mods.');
         }
 
         $server->transitionTo(ServerStatus::Stopping);
@@ -151,8 +151,8 @@ class ServerController extends Controller
 
     public function restart(Server $server): RedirectResponse
     {
-        if (! in_array($server->status, [ServerStatus::Running, ServerStatus::Booting])) {
-            return back()->with('error', 'Server can only be restarted when running or booting.');
+        if (! $server->status->isStoppable()) {
+            return back()->with('error', 'Server can only be restarted when running, booting, or downloading mods.');
         }
 
         $server->transitionTo(ServerStatus::Stopping);
@@ -171,14 +171,14 @@ class ServerController extends Controller
     {
         $processService->addHeadlessClient($server);
 
-        return back();
+        return back()->with('success', 'Headless client added.');
     }
 
     public function removeHeadlessClient(Server $server, ServerProcessService $processService): RedirectResponse
     {
         $processService->removeHeadlessClient($server);
 
-        return back();
+        return back()->with('success', 'Headless client removed.');
     }
 
     public function launchCommand(Server $server): JsonResponse

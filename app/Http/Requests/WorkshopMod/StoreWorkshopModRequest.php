@@ -18,7 +18,7 @@ class StoreWorkshopModRequest extends FormRequest
     {
         return [
             'workshop_id' => ['required', 'integer', 'min:1'],
-            'game_type' => ['nullable', Rule::in(app(GameManager::class)->availableTypes())],
+            'game_type' => ['required', Rule::in(app(GameManager::class)->availableTypes())],
         ];
     }
 }

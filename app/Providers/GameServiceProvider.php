@@ -128,9 +128,13 @@ class GameServiceProvider extends ServiceProvider
             /** @var class-string $class */
             $class = 'App\\GameHandlers\\'.pathinfo($file, PATHINFO_FILENAME);
 
+            if (! class_exists($class) || ! is_subclass_of($class, GameHandler::class)) {
+                continue;
+            }
+
             $reflection = new \ReflectionClass($class);
 
-            if (! class_exists($class) || ! is_subclass_of($class, GameHandler::class) || $reflection->isAbstract()) {
+            if ($reflection->isAbstract()) {
                 continue;
             }
 

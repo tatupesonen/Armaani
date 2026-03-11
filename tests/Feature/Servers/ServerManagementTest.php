@@ -984,4 +984,256 @@ class ServerManagementTest extends TestCase
         $lines = $response->json('lines');
         $this->assertCount(100, $lines);
     }
+
+    // ---------------------------------------------------------------
+    // Additional edge cases: status guards
+    // ---------------------------------------------------------------
+
+    public function test_start_rejected_when_server_is_booting(): void
+    {
+        Queue::fake();
+
+        $server = Server::factory()->create(['status' => ServerStatus::Booting]);
+
+        $this->post(route('servers.start', $server))
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        Queue::assertNotPushed(StartServerJob::class);
+    }
+
+    public function test_start_rejected_when_server_is_downloading_mods(): void
+    {
+        Queue::fake();
+
+        $server = Server::factory()->create(['status' => ServerStatus::DownloadingMods]);
+
+        $this->post(route('servers.start', $server))
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        Queue::assertNotPushed(StartServerJob::class);
+    }
+
+    public function test_stop_rejected_when_server_is_stopping(): void
+    {
+        Queue::fake();
+
+        $server = Server::factory()->create(['status' => ServerStatus::Stopping]);
+
+        $this->post(route('servers.stop', $server))
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        Queue::assertNotPushed(StopServerJob::class);
+    }
+
+    public function test_stop_rejected_when_server_is_crashed(): void
+    {
+        Queue::fake();
+
+        $server = Server::factory()->create(['status' => ServerStatus::Crashed]);
+
+        $this->post(route('servers.stop', $server))
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        Queue::assertNotPushed(StopServerJob::class);
+    }
+
+    public function test_stop_allowed_when_server_is_downloading_mods(): void
+    {
+        Queue::fake();
+
+        $server = Server::factory()->create(['status' => ServerStatus::DownloadingMods]);
+
+        $this->post(route('servers.stop', $server))
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('servers', [
+            'id' => $server->id,
+            'status' => ServerStatus::Stopping->value,
+        ]);
+
+        Queue::assertPushed(StopServerJob::class);
+    }
+
+    public function test_restart_rejected_when_server_is_starting(): void
+    {
+        Bus::fake();
+
+        $server = Server::factory()->create(['status' => ServerStatus::Starting]);
+
+        $this->post(route('servers.restart', $server))
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        Bus::assertNotDispatched(StopServerJob::class);
+    }
+
+    public function test_restart_rejected_when_server_is_stopping(): void
+    {
+        Bus::fake();
+
+        $server = Server::factory()->create(['status' => ServerStatus::Stopping]);
+
+        $this->post(route('servers.restart', $server))
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        Bus::assertNotDispatched(StopServerJob::class);
+    }
+
+    public function test_restart_rejected_when_server_is_crashed(): void
+    {
+        Bus::fake();
+
+        $server = Server::factory()->create(['status' => ServerStatus::Crashed]);
+
+        $this->post(route('servers.restart', $server))
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        Bus::assertNotDispatched(StopServerJob::class);
+    }
+
+    public function test_restart_allowed_when_server_is_downloading_mods(): void
+    {
+        Bus::fake();
+
+        $server = Server::factory()->create(['status' => ServerStatus::DownloadingMods]);
+
+        $this->post(route('servers.restart', $server))
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('servers', [
+            'id' => $server->id,
+            'status' => ServerStatus::Stopping->value,
+        ]);
+
+        Bus::assertChained([
+            StopServerJob::class,
+            StartServerJob::class,
+        ]);
+    }
+
+    // ---------------------------------------------------------------
+    // Additional edge cases: destroy status guards
+    // ---------------------------------------------------------------
+
+    public function test_destroy_rejected_when_server_is_starting(): void
+    {
+        $server = Server::factory()->create(['status' => ServerStatus::Starting]);
+
+        $this->delete(route('servers.destroy', $server))
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        $this->assertDatabaseHas('servers', ['id' => $server->id]);
+    }
+
+    public function test_destroy_rejected_when_server_is_booting(): void
+    {
+        $server = Server::factory()->create(['status' => ServerStatus::Booting]);
+
+        $this->delete(route('servers.destroy', $server))
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        $this->assertDatabaseHas('servers', ['id' => $server->id]);
+    }
+
+    public function test_destroy_rejected_when_server_is_stopping(): void
+    {
+        $server = Server::factory()->create(['status' => ServerStatus::Stopping]);
+
+        $this->delete(route('servers.destroy', $server))
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        $this->assertDatabaseHas('servers', ['id' => $server->id]);
+    }
+
+    public function test_destroy_rejected_when_server_is_downloading_mods(): void
+    {
+        $server = Server::factory()->create(['status' => ServerStatus::DownloadingMods]);
+
+        $this->delete(route('servers.destroy', $server))
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        $this->assertDatabaseHas('servers', ['id' => $server->id]);
+    }
+
+    public function test_destroy_allowed_when_server_is_crashed(): void
+    {
+        $server = Server::factory()->create(['status' => ServerStatus::Crashed]);
+
+        $this->delete(route('servers.destroy', $server))
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseMissing('servers', ['id' => $server->id]);
+    }
+
+    // ---------------------------------------------------------------
+    // Additional edge cases: validation boundaries
+    // ---------------------------------------------------------------
+
+    public function test_create_server_rejects_port_equal_to_query_port_of_other_server(): void
+    {
+        Server::factory()->create(['port' => 2400, 'query_port' => 2401]);
+
+        $this->post(route('servers.store'), [
+            'game_type' => 'arma3',
+            'name' => 'Port Conflict Server',
+            'port' => 2401,
+            'query_port' => 2402,
+            'max_players' => 32,
+            'game_install_id' => $this->gameInstall->id,
+        ])
+            ->assertSessionHasErrors(['port']);
+    }
+
+    public function test_create_server_rejects_description_exceeding_max_length(): void
+    {
+        $this->post(route('servers.store'), [
+            'game_type' => 'arma3',
+            'name' => 'Description Test',
+            'port' => 2302,
+            'query_port' => 2303,
+            'max_players' => 32,
+            'description' => str_repeat('x', 1001),
+            'game_install_id' => $this->gameInstall->id,
+        ])
+            ->assertSessionHasErrors(['description']);
+    }
+
+    // ---------------------------------------------------------------
+    // Additional edge cases: JSON endpoints require authentication
+    // ---------------------------------------------------------------
+
+    public function test_launch_command_requires_authentication(): void
+    {
+        $server = Server::factory()->create();
+
+        $this->asGuest()->get(route('servers.launch-command', $server))
+            ->assertRedirect(route('login'));
+    }
+
+    public function test_server_log_requires_authentication(): void
+    {
+        $server = Server::factory()->create();
+
+        $this->asGuest()->get(route('servers.log', $server))
+            ->assertRedirect(route('login'));
+    }
+
+    public function test_server_status_requires_authentication(): void
+    {
+        $server = Server::factory()->create();
+
+        $this->asGuest()->get(route('servers.status', $server))
+            ->assertRedirect(route('login'));
+    }
 }

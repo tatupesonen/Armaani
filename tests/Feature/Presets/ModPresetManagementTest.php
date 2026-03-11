@@ -466,7 +466,9 @@ class ModPresetManagementTest extends TestCase
 
         $this->post(route('presets.import'), [
             'import_file' => $file,
-        ]);
+        ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
 
         Queue::assertPushed(DownloadModJob::class);
     }
@@ -495,7 +497,9 @@ class ModPresetManagementTest extends TestCase
 
         $this->post(route('presets.import'), [
             'import_file' => $file,
-        ]);
+        ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
 
         Queue::assertNotPushed(DownloadModJob::class);
         Queue::assertNotPushed(BatchDownloadModsJob::class);
@@ -524,9 +528,37 @@ class ModPresetManagementTest extends TestCase
 
         $this->post(route('presets.import'), [
             'import_file' => $file,
-        ]);
+        ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
 
         Queue::assertPushed(BatchDownloadModsJob::class, 2);
+    }
+
+    public function test_import_preset_with_duplicate_name_returns_error(): void
+    {
+        Queue::fake();
+
+        ModPreset::factory()->create(['name' => 'Existing Preset', 'game_type' => 'arma3']);
+
+        $this->mock(SteamWorkshopService::class, function (MockInterface $mock) {
+            $mock->shouldReceive('getMultipleModDetails')
+                ->once()
+                ->andReturn([
+                    463939057 => ['name' => 'ACE3', 'file_size' => 100000],
+                ]);
+        });
+
+        SteamAccount::factory()->create();
+
+        $htmlContent = $this->makePresetHtml('Existing Preset', [463939057]);
+        $file = UploadedFile::fake()->createWithContent('preset.html', $htmlContent);
+
+        $this->post(route('presets.import'), [
+            'import_file' => $file,
+        ])
+            ->assertRedirect()
+            ->assertSessionHasErrors(['import_name']);
     }
 
     // ---------------------------------------------------------------

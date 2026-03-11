@@ -4,10 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Contracts\SupportsRegisteredMods;
 use App\GameManager;
+use App\Http\Requests\ReforgerMod\StoreRegisteredModRequest;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Validator;
 
 class RegisteredModController extends Controller
 {
@@ -15,7 +14,7 @@ class RegisteredModController extends Controller
         private GameManager $gameManager,
     ) {}
 
-    public function store(Request $request, string $gameType): RedirectResponse
+    public function store(StoreRegisteredModRequest $request, string $gameType): RedirectResponse
     {
         $handler = $this->gameManager->driver($gameType);
 
@@ -23,12 +22,7 @@ class RegisteredModController extends Controller
             abort(404);
         }
 
-        $validated = Validator::make(
-            $request->all(),
-            $handler->registeredModValidationRules(),
-        )->validate();
-
-        $mod = $handler->storeRegisteredMod($validated);
+        $mod = $handler->storeRegisteredMod($request->validated());
 
         /** @var string $modName */
         $modName = $mod->getAttribute('name');

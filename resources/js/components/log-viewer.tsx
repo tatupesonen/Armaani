@@ -41,10 +41,14 @@ export default function LogViewer({
 
     useEffect(() => {
         if (loadInitialLines) {
-            loadInitialLines().then((loaded) => {
-                setLines(loaded);
-                requestAnimationFrame(scrollToBottom);
-            });
+            loadInitialLines()
+                .then((loaded) => {
+                    setLines(loaded);
+                    requestAnimationFrame(scrollToBottom);
+                })
+                .catch(() => {
+                    // Silently handle fetch failures — the log viewer will show "Waiting for output..."
+                });
         }
     }, [loadInitialLines, scrollToBottom]);
 

@@ -47,7 +47,7 @@ jobs:
         run: npm run build
 
       - name: Tests
-        run: ./vendor/bin/phpunit
+        run: php artisan test --parallel
 
   docker-test:
     runs-on: ubuntu-latest

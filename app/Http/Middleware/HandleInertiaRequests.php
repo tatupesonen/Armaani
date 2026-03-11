@@ -57,12 +57,10 @@ class HandleInertiaRequests extends Middleware
                 ->toArray(),
             'activeServers' => fn () => $request->user()
                 ? Server::query()
-                    ->whereIn('status', [
-                        ServerStatus::Starting,
-                        ServerStatus::Booting,
-                        ServerStatus::Running,
-                        ServerStatus::Stopping,
-                    ])
+                    ->whereIn('status', array_map(
+                        fn (ServerStatus $s) => $s->value,
+                        array_filter(ServerStatus::cases(), fn (ServerStatus $s) => $s->isActive()),
+                    ))
                     ->get(['id', 'name', 'status'])
                     ->map(fn (Server $s): array => [
                         'id' => $s->id,

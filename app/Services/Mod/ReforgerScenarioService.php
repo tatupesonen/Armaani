@@ -4,6 +4,7 @@ namespace App\Services\Mod;
 
 use App\Models\ReforgerScenario;
 use App\Models\Server;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class ReforgerScenarioService
@@ -43,15 +44,20 @@ class ReforgerScenarioService
         $discovered = $this->discoverScenarios($server);
 
         if (! empty($discovered)) {
-            $server->reforgerScenarios()->delete();
+            DB::transaction(function () use ($server, $discovered): void {
+                $server->reforgerScenarios()->delete();
 
-            foreach ($discovered as $scenario) {
-                $server->reforgerScenarios()->create([
-                    'value' => $scenario['value'],
-                    'name' => $scenario['name'],
-                    'is_official' => $scenario['isOfficial'],
-                ]);
-            }
+                $server->reforgerScenarios()->insert(
+                    array_map(fn (array $scenario): array => [
+                        'server_id' => $server->id,
+                        'value' => $scenario['value'],
+                        'name' => $scenario['name'],
+                        'is_official' => $scenario['isOfficial'],
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ], $discovered),
+                );
+            });
         }
 
         return $discovered;

@@ -92,7 +92,7 @@ class WorkshopModController extends Controller
         $mod = WorkshopMod::query()->firstOrCreate(
             [
                 'workshop_id' => $validated['workshop_id'],
-                'game_type' => $validated['game_type'] ?? 'arma3',
+                'game_type' => $validated['game_type'],
             ],
             [
                 'installation_status' => InstallationStatus::Queued,
@@ -144,13 +144,13 @@ class WorkshopModController extends Controller
 
         $path = $workshopMod->getInstallationPath();
 
-        Log::info(auth_context()." deleted mod: {$workshopMod->name} ({$workshopMod->workshop_id})");
-
-        $workshopMod->delete();
-
         if (is_dir($path)) {
             File::deleteDirectory($path);
         }
+
+        Log::info(auth_context()." deleted mod: {$workshopMod->name} ({$workshopMod->workshop_id})");
+
+        $workshopMod->delete();
 
         return back()->with('success', 'Mod deleted.');
     }

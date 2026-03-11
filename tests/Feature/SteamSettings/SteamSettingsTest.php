@@ -398,10 +398,9 @@ class SteamSettingsTest extends TestCase
         $this->assertEquals('https://discord.com/api/webhooks/123/abc', $settings->discord_webhook_url);
     }
 
-    public function test_discord_webhook_ignores_empty_value(): void
+    public function test_discord_webhook_clears_when_empty_value_sent(): void
     {
         AppSetting::factory()->withDiscordWebhook()->create();
-        $original = AppSetting::query()->first()->discord_webhook_url;
 
         $this->post(route('steam-settings.discord-webhook'), [
             'discord_webhook_url' => '',
@@ -409,7 +408,7 @@ class SteamSettingsTest extends TestCase
             ->assertRedirect()
             ->assertSessionHas('success');
 
-        $this->assertEquals($original, AppSetting::query()->first()->discord_webhook_url);
+        $this->assertNull(AppSetting::query()->first()->discord_webhook_url);
     }
 
     public function test_discord_webhook_validates_url_format(): void

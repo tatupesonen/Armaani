@@ -77,13 +77,13 @@ class GameInstallController extends Controller
 
         $path = $gameInstall->getInstallationPath();
 
-        Log::info(auth_context()." deleted game install: {$gameInstall->name}");
-
-        $gameInstall->delete();
-
         if (is_dir($path)) {
             File::deleteDirectory($path);
         }
+
+        Log::info(auth_context()." deleted game install: {$gameInstall->name}");
+
+        $gameInstall->delete();
 
         return back()->with('success', 'Game install deleted.');
     }

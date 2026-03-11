@@ -216,7 +216,7 @@ class WorkshopModManagementTest extends TestCase
     {
         Queue::fake();
 
-        $this->post(route('mods.store'), ['workshop_id' => 463939057])
+        $this->post(route('mods.store'), ['workshop_id' => 463939057, 'game_type' => 'arma3'])
             ->assertRedirect()
             ->assertSessionHas('success');
 
@@ -242,7 +242,9 @@ class WorkshopModManagementTest extends TestCase
 
         WorkshopMod::factory()->installed()->create(['workshop_id' => 463939057]);
 
-        $this->post(route('mods.store'), ['workshop_id' => 463939057]);
+        $this->post(route('mods.store'), ['workshop_id' => 463939057, 'game_type' => 'arma3'])
+            ->assertRedirect()
+            ->assertSessionHas('success');
 
         $this->assertEquals(1, WorkshopMod::where('workshop_id', 463939057)->count());
         Queue::assertNotPushed(DownloadModJob::class);
@@ -254,7 +256,9 @@ class WorkshopModManagementTest extends TestCase
 
         WorkshopMod::factory()->failed()->create(['workshop_id' => 463939057]);
 
-        $this->post(route('mods.store'), ['workshop_id' => 463939057]);
+        $this->post(route('mods.store'), ['workshop_id' => 463939057, 'game_type' => 'arma3'])
+            ->assertRedirect()
+            ->assertSessionHas('success');
 
         $mod = WorkshopMod::where('workshop_id', 463939057)->first();
         $this->assertEquals(InstallationStatus::Queued, $mod->installation_status);
@@ -343,7 +347,9 @@ class WorkshopModManagementTest extends TestCase
 
         WorkshopMod::factory()->failed()->create();
 
-        $this->post(route('mods.retry-all-failed'));
+        $this->post(route('mods.retry-all-failed'))
+            ->assertRedirect()
+            ->assertSessionHas('success');
 
         Queue::assertPushed(DownloadModJob::class, 1);
         Queue::assertNotPushed(BatchDownloadModsJob::class);
@@ -357,7 +363,9 @@ class WorkshopModManagementTest extends TestCase
 
         WorkshopMod::factory()->failed()->count(5)->create();
 
-        $this->post(route('mods.retry-all-failed'));
+        $this->post(route('mods.retry-all-failed'))
+            ->assertRedirect()
+            ->assertSessionHas('success');
 
         // 5 mods with batch size 2 -> 2 BatchDownloadModsJobs (2+2) + 1 DownloadModJob (1)
         Queue::assertPushed(BatchDownloadModsJob::class, 2);
@@ -370,7 +378,9 @@ class WorkshopModManagementTest extends TestCase
 
         WorkshopMod::factory()->installed()->create();
 
-        $this->post(route('mods.retry-all-failed'));
+        $this->post(route('mods.retry-all-failed'))
+            ->assertRedirect()
+            ->assertSessionHas('info');
 
         Queue::assertNotPushed(DownloadModJob::class);
         Queue::assertNotPushed(BatchDownloadModsJob::class);
@@ -408,7 +418,9 @@ class WorkshopModManagementTest extends TestCase
 
         $mods = WorkshopMod::factory()->installed()->count(5)->create();
 
-        $this->post(route('mods.update-selected'), ['mod_ids' => $mods->pluck('id')->all()]);
+        $this->post(route('mods.update-selected'), ['mod_ids' => $mods->pluck('id')->all()])
+            ->assertRedirect()
+            ->assertSessionHas('success');
 
         // 5 mods with batch size 2 -> 2 BatchDownloadModsJobs (2+2) + 1 DownloadModJob (1)
         Queue::assertPushed(BatchDownloadModsJob::class, 2);
@@ -421,7 +433,9 @@ class WorkshopModManagementTest extends TestCase
 
         $mod = WorkshopMod::factory()->installed()->create();
 
-        $this->post(route('mods.update-selected'), ['mod_ids' => [$mod->id]]);
+        $this->post(route('mods.update-selected'), ['mod_ids' => [$mod->id]])
+            ->assertRedirect()
+            ->assertSessionHas('success');
 
         Queue::assertPushed(DownloadModJob::class, 1);
         Queue::assertNotPushed(BatchDownloadModsJob::class);
@@ -437,7 +451,9 @@ class WorkshopModManagementTest extends TestCase
 
         $this->post(route('mods.update-selected'), [
             'mod_ids' => [$installedMod->id, $installingMod->id, $queuedMod->id],
-        ]);
+        ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
 
         Queue::assertPushed(DownloadModJob::class, 1);
 
@@ -461,7 +477,9 @@ class WorkshopModManagementTest extends TestCase
 
         $mod = WorkshopMod::factory()->failed()->create();
 
-        $this->post(route('mods.update-selected'), ['mod_ids' => [$mod->id]]);
+        $this->post(route('mods.update-selected'), ['mod_ids' => [$mod->id]])
+            ->assertRedirect()
+            ->assertSessionHas('success');
 
         Queue::assertPushed(DownloadModJob::class, 1);
         $this->assertEquals(InstallationStatus::Queued, $mod->fresh()->installation_status);
@@ -501,7 +519,9 @@ class WorkshopModManagementTest extends TestCase
             $mock->shouldNotReceive('getMultipleModDetails');
         });
 
-        $this->post(route('mods.check-for-updates'));
+        $this->post(route('mods.check-for-updates'))
+            ->assertRedirect()
+            ->assertSessionHas('info');
     }
 
     // ---------------------------------------------------------------
@@ -534,7 +554,9 @@ class WorkshopModManagementTest extends TestCase
 
         WorkshopMod::factory()->installed()->create();
 
-        $this->post(route('mods.update-all-outdated'));
+        $this->post(route('mods.update-all-outdated'))
+            ->assertRedirect()
+            ->assertSessionHas('info');
 
         Queue::assertNotPushed(DownloadModJob::class);
         Queue::assertNotPushed(BatchDownloadModsJob::class);
@@ -548,10 +570,42 @@ class WorkshopModManagementTest extends TestCase
 
         WorkshopMod::factory()->outdated()->count(5)->create();
 
-        $this->post(route('mods.update-all-outdated'));
+        $this->post(route('mods.update-all-outdated'))
+            ->assertRedirect()
+            ->assertSessionHas('success');
 
         // 5 mods with batch size 2 -> 2 BatchDownloadModsJobs (2+2) + 1 DownloadModJob (1)
         Queue::assertPushed(BatchDownloadModsJob::class, 2);
         Queue::assertPushed(DownloadModJob::class, 1);
+    }
+
+    // ---------------------------------------------------------------
+    // Additional edge cases: validation
+    // ---------------------------------------------------------------
+
+    public function test_add_mod_rejects_negative_workshop_id(): void
+    {
+        $this->mock(SteamWorkshopService::class, function (MockInterface $mock) {
+            $mock->shouldNotReceive('getModDetails');
+        });
+
+        SteamAccount::factory()->create();
+
+        $this->post(route('mods.store'), [
+            'workshop_id' => -1,
+            'game_type' => 'arma3',
+        ])
+            ->assertSessionHasErrors(['workshop_id']);
+    }
+
+    public function test_add_mod_rejects_invalid_game_type(): void
+    {
+        SteamAccount::factory()->create();
+
+        $this->post(route('mods.store'), [
+            'workshop_id' => 463939057,
+            'game_type' => 'invalid_game',
+        ])
+            ->assertSessionHasErrors(['game_type']);
     }
 }

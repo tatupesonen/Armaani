@@ -69,6 +69,8 @@ export default function GameInstallsIndex({ installs, gameTypes }: Props) {
 
     function openCreateModal() {
         const defaultType = gameTypes[0];
+        if (!defaultType) return;
+
         createForm.setData({
             game_type: defaultType.value,
             name: defaultType.defaultName,

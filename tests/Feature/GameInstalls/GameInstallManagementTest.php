@@ -168,4 +168,24 @@ class GameInstallManagementTest extends TestCase
 
         $this->assertDatabaseHas('game_installs', ['id' => $install->id]);
     }
+
+    public function test_create_rejects_invalid_game_type(): void
+    {
+        $this->post(route('game-installs.store'), [
+            'game_type' => 'invalid_game',
+            'name' => 'Test Install',
+            'branch' => 'public',
+        ])
+            ->assertSessionHasErrors(['game_type']);
+    }
+
+    public function test_create_rejects_invalid_branch(): void
+    {
+        $this->post(route('game-installs.store'), [
+            'game_type' => 'arma3',
+            'name' => 'Test Install',
+            'branch' => 'nonexistent_branch',
+        ])
+            ->assertSessionHasErrors(['branch']);
+    }
 }

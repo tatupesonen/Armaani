@@ -125,4 +125,40 @@ class BroadcastEventsTest extends TestCase
 
         $this->assertEquals('', $event->serverName);
     }
+
+    // ---------------------------------------------------------------
+    // Broadcast channel authorization
+    // ---------------------------------------------------------------
+
+    public function test_authenticated_user_can_subscribe_to_server_log_channel(): void
+    {
+        $this->postJson('/broadcasting/auth', [
+            'channel_name' => 'private-server-log.1',
+        ])
+            ->assertOk();
+    }
+
+    public function test_authenticated_user_can_subscribe_to_game_install_channel(): void
+    {
+        $this->postJson('/broadcasting/auth', [
+            'channel_name' => 'private-game-install.1',
+        ])
+            ->assertOk();
+    }
+
+    public function test_authenticated_user_can_subscribe_to_mod_download_channel(): void
+    {
+        $this->postJson('/broadcasting/auth', [
+            'channel_name' => 'private-mod-download.1',
+        ])
+            ->assertOk();
+    }
+
+    public function test_authenticated_user_can_subscribe_to_servers_channel(): void
+    {
+        $this->postJson('/broadcasting/auth', [
+            'channel_name' => 'private-servers',
+        ])
+            ->assertOk();
+    }
 }

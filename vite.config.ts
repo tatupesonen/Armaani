@@ -15,16 +15,18 @@ function gameTypes(): Plugin {
 
     function generate() {
         try {
-            execSync(command, { stdio: 'ignore' });
+            execSync(command, { stdio: 'ignore', timeout: 10_000 });
         } catch {
-            // silently ignore — artisan may not be available during npm install
+            // silently ignore — artisan may not be available or DB may be locked
         }
     }
 
     return {
         name: 'game-types',
         buildStart() {
-            generate();
+            if (process.env.VITE_SKIP_GAME_TYPES !== '1') {
+                generate();
+            }
         },
         configureServer(server) {
             server.watcher.add('app/GameHandlers/**/*.php');

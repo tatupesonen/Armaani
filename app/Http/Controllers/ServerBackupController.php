@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Contracts\SupportsBackups;
-use App\Enums\ServerStatus;
 use App\GameManager;
 use App\Http\Requests\ServerBackup\StoreServerBackupRequest;
 use App\Http\Requests\ServerBackup\UploadServerBackupRequest;
@@ -48,7 +47,7 @@ class ServerBackupController extends Controller
     {
         $server = $serverBackup->server;
 
-        if ($server->status !== ServerStatus::Stopped) {
+        if (! $server->status->isDeletable()) {
             return back()->with('error', 'Server must be stopped before restoring a backup.');
         }
 

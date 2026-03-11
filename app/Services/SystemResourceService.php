@@ -5,13 +5,18 @@ namespace App\Services;
 class SystemResourceService
 {
     /**
-     * @return array{total: int|float|false, used: int|float, free: int|float|false, percent: float|int}
+     * @return array{total: int|float, used: int|float, free: int|float, percent: float|int}
      */
     public function getDiskUsage(): array
     {
         $path = storage_path();
         $total = disk_total_space($path);
         $free = disk_free_space($path);
+
+        if ($total === false || $free === false) {
+            return ['total' => 0, 'used' => 0, 'free' => 0, 'percent' => 0];
+        }
+
         $used = $total - $free;
 
         return [

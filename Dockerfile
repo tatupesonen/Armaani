@@ -105,7 +105,7 @@ RUN cp .env.example .env \
     && php -r "echo 'APP_KEY=base64:' . base64_encode(random_bytes(32)) . PHP_EOL;" >> .env \
     && composer install --optimize-autoloader
 
-CMD ["php", "artisan", "test", "--compact"]
+CMD ["php", "artisan", "test", "--compact", "--parallel"]
 
 # =============================================================================
 # Stage 3: Final runtime (base + built app, no Node)

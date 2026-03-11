@@ -254,4 +254,83 @@ class ServerBackupManagementTest extends TestCase
             'is_automatic' => true,
         ]);
     }
+
+    // ---------------------------------------------------------------
+    // Additional edge cases: restore status guards
+    // ---------------------------------------------------------------
+
+    public function test_restore_allowed_when_server_is_crashed(): void
+    {
+        $this->server->update(['status' => ServerStatus::Crashed]);
+
+        $data = "version=148;\nrestored=1;\n";
+        $backup = ServerBackup::factory()->create([
+            'server_id' => $this->server->id,
+            'data' => $data,
+        ]);
+
+        $this->post(route('servers.backups.restore', $backup))
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $varsPath = app(ServerBackupService::class)->getVarsFilePath($this->server);
+        $this->assertFileExists($varsPath);
+        $this->assertEquals($data, file_get_contents($varsPath));
+    }
+
+    public function test_restore_blocked_when_server_is_starting(): void
+    {
+        $this->server->update(['status' => ServerStatus::Starting]);
+
+        $backup = ServerBackup::factory()->create([
+            'server_id' => $this->server->id,
+            'data' => 'test',
+        ]);
+
+        $this->post(route('servers.backups.restore', $backup))
+            ->assertRedirect()
+            ->assertSessionHas('error');
+    }
+
+    public function test_restore_blocked_when_server_is_booting(): void
+    {
+        $this->server->update(['status' => ServerStatus::Booting]);
+
+        $backup = ServerBackup::factory()->create([
+            'server_id' => $this->server->id,
+            'data' => 'test',
+        ]);
+
+        $this->post(route('servers.backups.restore', $backup))
+            ->assertRedirect()
+            ->assertSessionHas('error');
+    }
+
+    public function test_restore_blocked_when_server_is_stopping(): void
+    {
+        $this->server->update(['status' => ServerStatus::Stopping]);
+
+        $backup = ServerBackup::factory()->create([
+            'server_id' => $this->server->id,
+            'data' => 'test',
+        ]);
+
+        $this->post(route('servers.backups.restore', $backup))
+            ->assertRedirect()
+            ->assertSessionHas('error');
+    }
+
+    public function test_restore_blocked_when_server_is_downloading_mods(): void
+    {
+        $this->server->update(['status' => ServerStatus::DownloadingMods]);
+
+        $backup = ServerBackup::factory()->create([
+            'server_id' => $this->server->id,
+            'data' => 'test',
+        ]);
+
+        $this->post(route('servers.backups.restore', $backup))
+            ->assertRedirect()
+            ->assertSessionHas('error');
+    }
 }

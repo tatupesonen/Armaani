@@ -132,6 +132,8 @@ class ModPresetController extends Controller
             $preset = $importService->importFromHtml($html, $request->input('import_name'));
         } catch (\InvalidArgumentException $e) {
             return back()->withErrors(['import_file' => $e->getMessage()]);
+        } catch (\Illuminate\Database\QueryException) {
+            return back()->withErrors(['import_name' => 'A preset with this name already exists.']);
         }
 
         $modCount = $preset->mods()->count();

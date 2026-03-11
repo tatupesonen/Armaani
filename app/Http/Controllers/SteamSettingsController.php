@@ -91,6 +91,8 @@ class SteamSettingsController extends Controller
 
         $account->update($validated);
 
+        Log::info(auth_context().' updated download settings');
+
         return back()->with('success', 'Settings saved.');
     }
 
@@ -101,6 +103,8 @@ class SteamSettingsController extends Controller
         if (! $account) {
             return back()->with('error', 'Save Steam credentials first.');
         }
+
+        Log::info(auth_context().' verified Steam login');
 
         try {
             $result = $steamCmd->validateCredentials($account->username, $account->password);
@@ -123,6 +127,8 @@ class SteamSettingsController extends Controller
             return back()->with('error', 'Save a Steam API key first.');
         }
 
+        Log::info(auth_context().' verified Steam API key');
+
         try {
             $result = $workshop->validateApiKey($account->steam_api_key);
 
@@ -140,10 +146,17 @@ class SteamSettingsController extends Controller
     {
         $validated = $request->validated();
 
-        if (! empty($validated['discord_webhook_url'])) {
-            $appSettings = AppSetting::current();
-            $appSettings->update(['discord_webhook_url' => $validated['discord_webhook_url']]);
+        $appSettings = AppSetting::current();
+
+        if (empty($validated['discord_webhook_url'])) {
+            $appSettings->update(['discord_webhook_url' => null]);
+            Log::info(auth_context().' removed Discord webhook');
+
+            return back()->with('success', 'Discord webhook removed.');
         }
+
+        $appSettings->update(['discord_webhook_url' => $validated['discord_webhook_url']]);
+        Log::info(auth_context().' updated Discord webhook');
 
         return back()->with('success', 'Discord webhook saved.');
     }
@@ -153,6 +166,8 @@ class SteamSettingsController extends Controller
         if (! $discord->isConfigured()) {
             return back()->with('error', 'Save a Discord webhook URL first.');
         }
+
+        Log::info(auth_context().' tested Discord webhook');
 
         $result = $discord->sendTestMessage();
 

@@ -57,9 +57,9 @@ export default function CreateServerDialog({
     gameInstalls,
     presets,
 }: CreateServerDialogProps) {
-    const firstGt = gameTypes[0];
+    const firstGt = gameTypes[0] ?? null;
     const [data, setData] = useState<Record<string, unknown>>(() =>
-        buildFormDefaults(firstGt, gameInstalls),
+        firstGt ? buildFormDefaults(firstGt, gameInstalls) : {},
     );
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [processing, setProcessing] = useState(false);

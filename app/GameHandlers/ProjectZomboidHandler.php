@@ -174,6 +174,7 @@ final class ProjectZomboidHandler extends AbstractGameHandler implements Detects
     public function serverValidationRules(?Server $server = null): array
     {
         return [
+            ...parent::serverValidationRules($server),
             'password' => ['nullable', 'string', 'max:255'],
             'additional_params' => ['nullable', 'string', 'max:1000'],
         ];

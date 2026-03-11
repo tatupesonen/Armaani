@@ -210,10 +210,10 @@ class MissionManagementTest extends TestCase
         $this->assertFileDoesNotExist($this->testPath('missions').'/to_delete.pbo');
     }
 
-    public function test_delete_nonexistent_mission_still_redirects(): void
+    public function test_delete_nonexistent_mission_returns_error(): void
     {
         $this->delete(route('missions.destroy', 'no_such_file.pbo'))
             ->assertRedirect()
-            ->assertSessionHas('success');
+            ->assertSessionHas('error');
     }
 }
