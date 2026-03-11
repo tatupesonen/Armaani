@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.7.0](https://github.com/tatupesonen/Armaani/compare/v1.6.2...v1.7.0) (2026-03-11)
+
+
+### Features
+
+* allow tailing multiple log files ([a544fec](https://github.com/tatupesonen/Armaani/commit/a544fec4b23f8e3d0dae1a14078d387c63c53b92))
+* allow tailing multiple log files ([2eed107](https://github.com/tatupesonen/Armaani/commit/2eed107c2ba869e8fade4735006b75d8fe8b70dc))
+* logging fixes ([4dff2c9](https://github.com/tatupesonen/Armaani/commit/4dff2c959a06ba2d919398b4666c571bdd1ba50f))
+
 ## [1.6.2](https://github.com/tatupesonen/Armaani/compare/v1.6.1...v1.6.2) (2026-03-11)
 
 
