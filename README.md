@@ -1,4 +1,4 @@
-# Armaani
+![Dashboard](public/og-image.png)
 
 Armaani _(Finnish for *"my dear"*)_ is a web-based game server manager for Arma 3, Arma Reforger, and (soon) DayZ. Install, configure, and manage dedicated server instances from a single UI.
 
