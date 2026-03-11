@@ -62,6 +62,7 @@ export default function ServersIndex({
     function handleDelete() {
         if (deletingServerId === null) return;
         router.delete(destroy.url(deletingServerId), {
+            preserveScroll: true,
             onSuccess: () => setDeletingServerId(null),
         });
     }

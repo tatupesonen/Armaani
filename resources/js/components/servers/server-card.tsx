@@ -150,7 +150,13 @@ export default function ServerCard({
                             <Button
                                 size="sm"
                                 variant="destructive"
-                                onClick={() => router.post(stop.url(server.id))}
+                                onClick={() =>
+                                    router.post(
+                                        stop.url(server.id),
+                                        {},
+                                        { preserveScroll: true },
+                                    )
+                                }
                             >
                                 <Pause className="mr-2 size-4" />
                                 Stop
@@ -159,7 +165,11 @@ export default function ServerCard({
                                 size="sm"
                                 variant="outline"
                                 onClick={() =>
-                                    router.post(restart.url(server.id))
+                                    router.post(
+                                        restart.url(server.id),
+                                        {},
+                                        { preserveScroll: true },
+                                    )
                                 }
                             >
                                 <RefreshCw className="mr-2 size-4" />
@@ -171,7 +181,13 @@ export default function ServerCard({
                             <Button
                                 size="sm"
                                 variant="destructive"
-                                onClick={() => router.post(stop.url(server.id))}
+                                onClick={() =>
+                                    router.post(
+                                        stop.url(server.id),
+                                        {},
+                                        { preserveScroll: true },
+                                    )
+                                }
                             >
                                 <Pause className="mr-2 size-4" />
                                 Stop
@@ -180,7 +196,11 @@ export default function ServerCard({
                                 size="sm"
                                 variant="outline"
                                 onClick={() =>
-                                    router.post(restart.url(server.id))
+                                    router.post(
+                                        restart.url(server.id),
+                                        {},
+                                        { preserveScroll: true },
+                                    )
                                 }
                             >
                                 <RefreshCw className="mr-2 size-4" />
@@ -190,7 +210,13 @@ export default function ServerCard({
                     ) : (
                         <Button
                             size="sm"
-                            onClick={() => router.post(start.url(server.id))}
+                            onClick={() =>
+                                router.post(
+                                    start.url(server.id),
+                                    {},
+                                    { preserveScroll: true },
+                                )
+                            }
                         >
                             <Play className="mr-2 size-4" />
                             Start
