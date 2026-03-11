@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.8.0](https://github.com/tatupesonen/Armaani/compare/v1.7.1...v1.8.0) (2026-03-11)
+
+
+### Features
+
+* add paratest, general improvements ([a32f95d](https://github.com/tatupesonen/Armaani/commit/a32f95d2ad21b7aedfa0b006fa944dfb447ac9f0))
+* fix crash handling ([504c001](https://github.com/tatupesonen/Armaani/commit/504c0018f5c2e5b5858be64bb8e8059acdc5145b))
+* improvements ([396abdc](https://github.com/tatupesonen/Armaani/commit/396abdc4922362054c11d40ac42c2a9690804dc4))
+* move game-specific fields from servers table to game settings tables ([7eab204](https://github.com/tatupesonen/Armaani/commit/7eab20470c7e7f4c0fa60da02c5aacff5e509560))
+* remove AUDIT_PLAN.md left over from LLMs in previous commit ([8fdb0fc](https://github.com/tatupesonen/Armaani/commit/8fdb0fc0c3b33b059644ae22e17c897ba2c0cc91))
+* rewrite tests, add SteamWorkshopMods contract ([44a4075](https://github.com/tatupesonen/Armaani/commit/44a40751afb1e524e55975e844aeef6345072d86))
+
+
+### Bug Fixes
+
+* add missing tests/Unit directory for ParaTest ([5f42f66](https://github.com/tatupesonen/Armaani/commit/5f42f664dc7734f2b854f85a56e7b1da8177d751))
+
 ## [1.7.1](https://github.com/tatupesonen/Armaani/compare/v1.7.0...v1.7.1) (2026-03-11)
 
 
