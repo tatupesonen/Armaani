@@ -1,20 +1,11 @@
 import { Head, router, usePoll } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import ConfirmDeleteDialog from '@/components/confirm-delete-dialog';
 import Heading from '@/components/heading';
 import CreateServerDialog from '@/components/servers/create-server-dialog';
 import ServerCard from '@/components/servers/server-card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import echo from '@/echo';
 import AppLayout from '@/layouts/app-layout';
@@ -135,28 +126,13 @@ export default function ServersIndex({
             />
 
             {/* Delete Confirmation */}
-            <AlertDialog
+            <ConfirmDeleteDialog
                 open={deletingServerId !== null}
                 onOpenChange={(open) => !open && setDeletingServerId(null)}
-            >
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Server</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Are you sure? This action cannot be undone.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={handleDelete}
-                            variant="destructive"
-                        >
-                            Delete
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+                onConfirm={handleDelete}
+                title="Delete Server"
+                description="Are you sure? This action cannot be undone."
+            />
         </AppLayout>
     );
 }

@@ -2,11 +2,11 @@
 
 namespace App\Jobs;
 
-use App\Contracts\SupportsWorkshopMods;
 use App\Enums\InstallationStatus;
 use App\Events\ModDownloadOutput;
 use App\GameManager;
 use App\Jobs\Concerns\InteractsWithFileSystem;
+use App\Jobs\Concerns\InteractsWithModDownloads;
 use App\Models\WorkshopMod;
 use App\Services\Steam\SteamCmdService;
 use App\Services\Steam\SteamWorkshopService;
@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Log;
 class DownloadModJob implements ShouldQueue
 {
     use InteractsWithFileSystem;
+    use InteractsWithModDownloads;
     use Queueable;
 
     public int $tries = 2;
@@ -48,63 +49,16 @@ class DownloadModJob implements ShouldQueue
 
         ModDownloadOutput::dispatch($this->mod->id, 0, 'Starting SteamCMD download...');
 
-        $lastProgressUpdate = -1;
+        $lastProgress = $this->pollSingleModProgress($process, $this->mod, $modPath, $expectedSize, -1);
 
-        while ($process->running()) {
-            sleep(1);
-
-            if ($expectedSize > 0) {
-                $currentSize = $this->getDirectorySize($modPath);
-                $pct = min(99, (int) round(($currentSize / $expectedSize) * 100));
-
-                if ($pct >= $lastProgressUpdate + 1) {
-                    $lastProgressUpdate = $pct;
-                    $this->mod->updateQuietly(['progress_pct' => $pct]);
-
-                    ModDownloadOutput::dispatch(
-                        $this->mod->id,
-                        $pct,
-                        "Downloading... {$pct}% ({$currentSize} / {$expectedSize} bytes)",
-                    );
-                }
-            }
-        }
+        $this->broadcastProcessOutput($process, $this->mod->id, $lastProgress);
 
         $result = $process->wait();
 
-        $output = trim($result->output().' '.$result->errorOutput());
-        if ($output) {
-            foreach (explode("\n", $output) as $outputLine) {
-                $trimmed = trim($outputLine);
-                if ($trimmed !== '') {
-                    ModDownloadOutput::dispatch($this->mod->id, max($lastProgressUpdate, 0), $trimmed);
-                }
-            }
-        }
-
         if ($result->successful()) {
-            if ($handler instanceof SupportsWorkshopMods && $handler->requiresLowercaseConversion()) {
-                $this->convertToLowercase($modPath);
-            }
-
-            $actualSize = $this->getDirectorySize($modPath);
-
-            $this->mod->update([
-                'installation_status' => InstallationStatus::Installed,
-                'progress_pct' => 100,
-                'installed_at' => now(),
-                'file_size' => $actualSize > 0 ? $actualSize : $this->mod->file_size,
-            ]);
-
-            Log::info("{$context} Downloaded successfully (disk: {$actualSize} bytes)");
-
-            ModDownloadOutput::dispatch($this->mod->id, 100, 'Download completed successfully.');
+            $this->finalizeSuccessfulMod($this->mod, $handler, $context);
         } else {
-            Log::error("{$context} Download failed: {$result->errorOutput()}");
-            $this->mod->update(['installation_status' => InstallationStatus::Failed]);
-
-            ModDownloadOutput::dispatch($this->mod->id, 0, 'Download failed: '.$result->errorOutput());
-
+            $this->markModFailed($this->mod, $result->errorOutput(), $context);
             $this->fail(new \RuntimeException('SteamCMD failed: '.$result->errorOutput()));
         }
     }

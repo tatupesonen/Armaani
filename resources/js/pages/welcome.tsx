@@ -24,6 +24,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import AppLogoColor from '@/components/app-logo-color';
 import { Badge } from '@/components/ui/badge';
+import { statusGradients } from '@/lib/server-status';
 import { dashboard, login } from '@/routes';
 
 const GITHUB_URL = 'https://github.com/tatupesonen/Armaani';
@@ -452,30 +453,12 @@ function StepCard({
 /*  Server lifecycle demo                                                     */
 /* -------------------------------------------------------------------------- */
 
-const statusGradients = [
-    {
-        status: 'starting',
-        color: 'from-amber-400/20 to-zinc-300/5 dark:from-amber-500/15 dark:to-zinc-600/5',
-        shimmer: 'motion-safe:animate-shimmer',
-    },
-    {
-        status: 'booting',
-        color: 'from-blue-400/20 to-zinc-300/5 dark:from-blue-500/15 dark:to-zinc-600/5',
-        shimmer: 'motion-safe:animate-shimmer',
-    },
-    {
-        status: 'downloading_mods',
-        color: 'from-purple-400/20 to-zinc-300/5 dark:from-purple-500/15 dark:to-zinc-600/5',
-        shimmer: 'motion-safe:animate-shimmer',
-    },
-    {
-        status: 'running',
-        color: 'from-emerald-400/20 to-zinc-300/5 dark:from-emerald-500/15 dark:to-zinc-600/5',
-        shimmer: null,
-    },
-] as const;
-
-type DemoStatus = (typeof statusGradients)[number]['status'] | 'stopped';
+type DemoStatus =
+    | 'stopped'
+    | 'starting'
+    | 'booting'
+    | 'downloading_mods'
+    | 'running';
 
 const statusLabels: Record<DemoStatus, string> = {
     stopped: 'Stopped',

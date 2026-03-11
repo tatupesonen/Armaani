@@ -16,6 +16,7 @@ import HeadlessClientControls from '@/components/servers/headless-client-control
 import ServerEditPanel from '@/components/servers/server-edit-panel';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { statusGradients } from '@/lib/server-status';
 import { serverStatusLabel, serverStatusVariant } from '@/lib/utils';
 import {
     start,
@@ -35,39 +36,6 @@ type ServerCardProps = {
     supportsAutoRestart: boolean;
     onDelete: (id: number) => void;
 };
-
-const statusGradients = [
-    {
-        status: 'starting',
-        color: 'from-amber-400/20 to-zinc-300/5 dark:from-amber-500/15 dark:to-zinc-600/5',
-        shimmer: 'motion-safe:animate-shimmer',
-    },
-    {
-        status: 'booting',
-        color: 'from-blue-400/20 to-zinc-300/5 dark:from-blue-500/15 dark:to-zinc-600/5',
-        shimmer: 'motion-safe:animate-shimmer',
-    },
-    {
-        status: 'downloading_mods',
-        color: 'from-purple-400/20 to-zinc-300/5 dark:from-purple-500/15 dark:to-zinc-600/5',
-        shimmer: 'motion-safe:animate-shimmer',
-    },
-    {
-        status: 'running',
-        color: 'from-emerald-400/20 to-zinc-300/5 dark:from-emerald-500/15 dark:to-zinc-600/5',
-        shimmer: null,
-    },
-    {
-        status: 'stopping',
-        color: 'from-red-400/20 to-zinc-300/5 dark:from-red-500/15 dark:to-zinc-600/5',
-        shimmer: 'motion-safe:animate-shimmer-fast',
-    },
-    {
-        status: 'crashed',
-        color: 'from-red-500/25 to-zinc-300/5 dark:from-red-600/20 dark:to-zinc-600/5',
-        shimmer: null,
-    },
-] as const;
 
 export default function ServerCard({
     server,
@@ -89,16 +57,25 @@ export default function ServerCard({
     const showHC = supportsHeadlessClients && server.status === 'running';
 
     const loadInitialLogLines = useCallback(async (): Promise<string[]> => {
-        const res = await fetch(serverLog.url(server.id));
-        const data = await res.json();
-        return data.lines ?? [];
+        try {
+            const res = await fetch(serverLog.url(server.id));
+            const data = await res.json();
+            return data.lines ?? [];
+        } catch (error) {
+            console.error('Failed to load server log lines:', error);
+            return [];
+        }
     }, [server.id]);
 
     function toggleCommand() {
         if (!showCommand && commandText === null) {
             fetch(launchCommand.url(server.id))
                 .then((res) => res.json())
-                .then((data) => setCommandText(data.command));
+                .then((data) => setCommandText(data.command))
+                .catch((error) => {
+                    console.error('Failed to load launch command:', error);
+                    setCommandText('Failed to load command');
+                });
         }
         setShowCommand((prev) => !prev);
     }

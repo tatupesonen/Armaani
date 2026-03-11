@@ -30,6 +30,7 @@ class DayZSettings extends Model
     protected function casts(): array
     {
         return [
+            'respawn_time' => 'integer',
             'time_acceleration' => 'decimal:2',
             'night_time_acceleration' => 'decimal:2',
             'force_same_build' => 'boolean',

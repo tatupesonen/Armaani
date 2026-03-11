@@ -9,12 +9,17 @@ use App\Models\ModPreset;
 use App\Models\Server;
 use App\Models\SteamAccount;
 use App\Models\WorkshopMod;
+use App\Services\SystemResourceService;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class DashboardController extends Controller
 {
+    public function __construct(
+        private SystemResourceService $systemResources,
+    ) {}
+
     public function index(): Response
     {
         return Inertia::render('dashboard', [
@@ -29,12 +34,15 @@ class DashboardController extends Controller
             ],
             'steamConfigured' => SteamAccount::query()->exists(),
             'servers' => Server::query()->with('gameInstall')->orderBy('name')->get(),
-            'diskUsage' => $this->getDiskUsage(),
-            'memoryUsage' => $this->getMemoryUsage(),
-            'cpuInfo' => $this->getCpuInfo(),
+            'diskUsage' => $this->systemResources->getDiskUsage(),
+            'memoryUsage' => $this->systemResources->getMemoryUsage(),
+            'cpuInfo' => $this->systemResources->getCpuInfo(),
         ]);
     }
 
+    /**
+     * @return array{total: int, running: int, stopped: int}
+     */
     private function getServerStats(): array
     {
         $servers = Server::query()->get(['id', 'status', 'max_players']);
@@ -48,6 +56,9 @@ class DashboardController extends Controller
         ];
     }
 
+    /**
+     * @return array{total: int, installed: int, disk_size: int|float}
+     */
     private function getGameInstallStats(): array
     {
         $installs = GameInstall::query()->get(['id', 'installation_status', 'disk_size_bytes']);
@@ -59,6 +70,9 @@ class DashboardController extends Controller
         ];
     }
 
+    /**
+     * @return array{total: int, installed: int, total_size: int}
+     */
     private function getModStats(): array
     {
         /** @var object{total: int|string, installed: int|string, total_size: int|string} $result */
@@ -83,61 +97,5 @@ class DashboardController extends Controller
         }
 
         return count(glob($path.'/*.pbo') ?: []);
-    }
-
-    private function getDiskUsage(): array
-    {
-        $path = storage_path();
-        $total = disk_total_space($path);
-        $free = disk_free_space($path);
-        $used = $total - $free;
-
-        return [
-            'total' => $total,
-            'used' => $used,
-            'free' => $free,
-            'percent' => $total > 0 ? round(($used / $total) * 100, 1) : 0,
-        ];
-    }
-
-    private function getMemoryUsage(): array
-    {
-        if (! is_readable('/proc/meminfo')) {
-            return ['total' => 0, 'used' => 0, 'free' => 0, 'percent' => 0];
-        }
-
-        $meminfo = file_get_contents('/proc/meminfo');
-        preg_match('/MemTotal:\s+(\d+)/', $meminfo, $totalMatch);
-        preg_match('/MemAvailable:\s+(\d+)/', $meminfo, $availableMatch);
-
-        $total = ((int) ($totalMatch[1] ?? 0)) * 1024;
-        $available = ((int) ($availableMatch[1] ?? 0)) * 1024;
-        $used = $total - $available;
-
-        return [
-            'total' => $total,
-            'used' => $used,
-            'free' => $available,
-            'percent' => $total > 0 ? round(($used / $total) * 100, 1) : 0,
-        ];
-    }
-
-    private function getCpuInfo(): array
-    {
-        $loadAvg = sys_getloadavg();
-        $cores = 1;
-
-        if (is_readable('/proc/cpuinfo')) {
-            $cpuinfo = file_get_contents('/proc/cpuinfo');
-            $cores = max(1, substr_count($cpuinfo, 'processor'));
-        }
-
-        return [
-            'load_1' => round($loadAvg[0], 2),
-            'load_5' => round($loadAvg[1], 2),
-            'load_15' => round($loadAvg[2], 2),
-            'cores' => $cores,
-            'percent' => round(($loadAvg[0] / $cores) * 100, 1),
-        ];
     }
 }

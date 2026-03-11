@@ -49,7 +49,10 @@ export default function ReforgerScenarioPicker({
                 setScenarios(res.data.scenarios ?? []);
                 setLoaded(true);
             })
-            .catch(() => setLoaded(true))
+            .catch((error) => {
+                console.error('Failed to load scenarios:', error);
+                setLoaded(true);
+            })
             .finally(() => setLoading(false));
     }, [loaded, loading, serverId]);
 
@@ -64,7 +67,9 @@ export default function ReforgerScenarioPicker({
                 setScenarios(res.data.scenarios ?? []);
                 setLoaded(true);
             })
-            .catch(() => {})
+            .catch((error) => {
+                console.error('Failed to reload scenarios:', error);
+            })
             .finally(() => setLoading(false));
     }, [loading, serverId]);
 

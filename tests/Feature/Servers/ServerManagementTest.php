@@ -304,6 +304,7 @@ class ServerManagementTest extends TestCase
             'game_type' => 'reforger',
             'name' => 'Reforger Server',
             'port' => 2001,
+            'query_port' => 17777,
             'max_players' => 32,
             'game_install_id' => $reforgerInstall->id,
             'scenario_id' => '{ECC61978EDCC2B5A}Missions/23_Campaign.conf',
@@ -326,6 +327,7 @@ class ServerManagementTest extends TestCase
             'game_type' => 'reforger',
             'name' => 'Reforger No Scenario',
             'port' => 2001,
+            'query_port' => 17777,
             'max_players' => 32,
             'game_install_id' => $reforgerInstall->id,
         ])
@@ -564,6 +566,19 @@ class ServerManagementTest extends TestCase
         $this->assertDatabaseHas('servers', ['id' => $server->id]);
     }
 
+    public function test_create_server_rejects_invalid_game_type(): void
+    {
+        $this->post(route('servers.store'), [
+            'game_type' => 'invalid_game',
+            'name' => 'Invalid Game Server',
+            'port' => 2302,
+            'query_port' => 2303,
+            'max_players' => 32,
+            'game_install_id' => $this->gameInstall->id,
+        ])
+            ->assertSessionHasErrors(['game_type']);
+    }
+
     // ---------------------------------------------------------------
     // Start / Stop / Restart
     // ---------------------------------------------------------------
@@ -620,6 +635,106 @@ class ServerManagementTest extends TestCase
             StopServerJob::class,
             StartServerJob::class,
         ]);
+    }
+
+    public function test_start_rejected_when_server_already_running(): void
+    {
+        Queue::fake();
+
+        $server = Server::factory()->create(['status' => ServerStatus::Running]);
+
+        $this->post(route('servers.start', $server))
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        $this->assertDatabaseHas('servers', [
+            'id' => $server->id,
+            'status' => ServerStatus::Running->value,
+        ]);
+
+        Queue::assertNotPushed(StartServerJob::class);
+    }
+
+    public function test_start_rejected_when_server_is_starting(): void
+    {
+        Queue::fake();
+
+        $server = Server::factory()->create(['status' => ServerStatus::Starting]);
+
+        $this->post(route('servers.start', $server))
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        Queue::assertNotPushed(StartServerJob::class);
+    }
+
+    public function test_start_rejected_when_server_is_stopping(): void
+    {
+        Queue::fake();
+
+        $server = Server::factory()->create(['status' => ServerStatus::Stopping]);
+
+        $this->post(route('servers.start', $server))
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        Queue::assertNotPushed(StartServerJob::class);
+    }
+
+    public function test_stop_rejected_when_server_already_stopped(): void
+    {
+        Queue::fake();
+
+        $server = Server::factory()->create(['status' => ServerStatus::Stopped]);
+
+        $this->post(route('servers.stop', $server))
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        Queue::assertNotPushed(StopServerJob::class);
+    }
+
+    public function test_stop_rejected_when_server_is_starting(): void
+    {
+        Queue::fake();
+
+        $server = Server::factory()->create(['status' => ServerStatus::Starting]);
+
+        $this->post(route('servers.stop', $server))
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        Queue::assertNotPushed(StopServerJob::class);
+    }
+
+    public function test_restart_rejected_when_server_is_stopped(): void
+    {
+        Bus::fake();
+
+        $server = Server::factory()->create(['status' => ServerStatus::Stopped]);
+
+        $this->post(route('servers.restart', $server))
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        Bus::assertNotDispatched(StopServerJob::class);
+    }
+
+    public function test_start_allowed_when_server_is_crashed(): void
+    {
+        Queue::fake();
+
+        $server = Server::factory()->create(['status' => ServerStatus::Crashed]);
+
+        $this->post(route('servers.start', $server))
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('servers', [
+            'id' => $server->id,
+            'status' => ServerStatus::Starting->value,
+        ]);
+
+        Queue::assertPushed(StartServerJob::class);
     }
 
     // ---------------------------------------------------------------

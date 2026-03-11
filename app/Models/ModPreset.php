@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  *
  * Dynamic relationships registered by GameServiceProvider via resolveRelationUsing:
  *
- * @method \Illuminate\Database\Eloquent\Relations\BelongsToMany reforgerMods()
+ * @method \Illuminate\Database\Eloquent\Relations\BelongsToMany<\App\Models\ReforgerMod, $this> reforgerMods()
  *
  * @property \Illuminate\Database\Eloquent\Collection<int, \App\Models\ReforgerMod> $reforgerMods
  */
@@ -41,6 +41,7 @@ class ModPreset extends Model
 
     /**
      * @param  Builder<ModPreset>  $query
+     * @return Builder<ModPreset>
      */
     public function scopeForGame(Builder $query, string $gameType): Builder
     {

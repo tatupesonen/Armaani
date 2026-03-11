@@ -12,19 +12,10 @@ import {
     Trash2,
 } from 'lucide-react';
 import { useState } from 'react';
+import ConfirmDeleteDialog from '@/components/confirm-delete-dialog';
 import Heading from '@/components/heading';
 import LogViewer from '@/components/log-viewer';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -310,13 +301,6 @@ export default function ModsIndex({
         );
     }
 
-    function formatStatsSize(bytes: number): string {
-        if (bytes >= 1073741824) {
-            return (bytes / 1073741824).toFixed(2) + ' GB';
-        }
-        return (bytes / 1048576).toFixed(1) + ' MB';
-    }
-
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Workshop Mods" />
@@ -327,7 +311,7 @@ export default function ModsIndex({
                         title="Workshop Mods"
                         description={
                             installedStats.count > 0
-                                ? `Download and manage Steam Workshop mods. \u2014 ${installedStats.count} installed, ${formatStatsSize(installedStats.total_size)} total`
+                                ? `Download and manage Steam Workshop mods. \u2014 ${installedStats.count} installed, ${formatBytes(installedStats.total_size)} total`
                                 : 'Download and manage Steam Workshop mods.'
                         }
                     />
@@ -630,54 +614,22 @@ export default function ModsIndex({
             </Dialog>
 
             {/* Delete Workshop Mod Confirmation */}
-            <AlertDialog
+            <ConfirmDeleteDialog
                 open={deletingModId !== null}
                 onOpenChange={(open) => !open && setDeletingModId(null)}
-            >
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Mod</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            This will remove the mod files and detach it from
-                            all presets.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={handleDelete}
-                            variant="destructive"
-                        >
-                            Delete
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+                onConfirm={handleDelete}
+                title="Delete Mod"
+                description="This will remove the mod files and detach it from all presets."
+            />
 
             {/* Delete Registered Mod Confirmation */}
-            <AlertDialog
+            <ConfirmDeleteDialog
                 open={deletingRegisteredMod !== null}
                 onOpenChange={(open) => !open && setDeletingRegisteredMod(null)}
-            >
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Mod</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            This will remove the mod and detach it from all
-                            presets.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={handleDeleteRegisteredMod}
-                            variant="destructive"
-                        >
-                            Delete
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+                onConfirm={handleDeleteRegisteredMod}
+                title="Delete Mod"
+                description="This will remove the mod and detach it from all presets."
+            />
         </AppLayout>
     );
 }
@@ -779,10 +731,7 @@ function RegisteredModTab({
                                     className="border-b last:border-0"
                                 >
                                     <td className="px-4 py-3 font-mono text-xs">
-                                        {
-                                            (mod as Record<string, unknown>)
-                                                .mod_id as string
-                                        }
+                                        {mod.mod_id}
                                     </td>
                                     <td className="px-4 py-3">{mod.name}</td>
                                     <td className="px-4 py-3">

@@ -2,11 +2,11 @@
 
 namespace App\Jobs;
 
-use App\Contracts\SupportsWorkshopMods;
 use App\Enums\InstallationStatus;
 use App\Events\ModDownloadOutput;
 use App\GameManager;
 use App\Jobs\Concerns\InteractsWithFileSystem;
+use App\Jobs\Concerns\InteractsWithModDownloads;
 use App\Models\SteamAccount;
 use App\Models\WorkshopMod;
 use App\Services\Steam\SteamCmdService;
@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\Log;
 class BatchDownloadModsJob implements ShouldQueue
 {
     use InteractsWithFileSystem;
+    use InteractsWithModDownloads;
     use Queueable;
 
     public int $tries = 2;
@@ -46,7 +47,7 @@ class BatchDownloadModsJob implements ShouldQueue
             if ($batch->count() === 1) {
                 DownloadModJob::dispatch($batch->first());
             } else {
-                static::dispatch($batch);
+                self::dispatch($batch);
             }
         }
     }
@@ -130,9 +131,13 @@ class BatchDownloadModsJob implements ShouldQueue
         }
 
         if ($result->successful()) {
-            $this->processSuccessfulBatch($handler);
+            foreach ($this->mods as $mod) {
+                $this->finalizeSuccessfulMod($mod, $handler, "[BatchDownload] Mod {$mod->workshop_id}");
+            }
         } else {
-            $this->processFailedBatch($result->errorOutput());
+            foreach ($this->mods as $mod) {
+                $this->markModFailed($mod, $result->errorOutput(), "[BatchDownload] Mod {$mod->workshop_id}");
+            }
         }
     }
 
@@ -143,44 +148,6 @@ class BatchDownloadModsJob implements ShouldQueue
         foreach ($this->mods as $mod) {
             $mod->update(['installation_status' => InstallationStatus::Failed]);
             ModDownloadOutput::dispatch($mod->id, 0, 'Batch download failed: '.($exception?->getMessage() ?? 'Unknown error'));
-        }
-    }
-
-    /**
-     * Process all mods after a successful SteamCMD batch download.
-     */
-    private function processSuccessfulBatch(\App\Contracts\GameHandler $handler): void
-    {
-        foreach ($this->mods as $mod) {
-            $modPath = $mod->getInstallationPath();
-
-            if ($handler instanceof SupportsWorkshopMods && $handler->requiresLowercaseConversion()) {
-                $this->convertToLowercase($modPath);
-            }
-            $actualSize = $this->getDirectorySize($modPath);
-
-            $mod->update([
-                'installation_status' => InstallationStatus::Installed,
-                'progress_pct' => 100,
-                'installed_at' => now(),
-                'file_size' => $actualSize > 0 ? $actualSize : $mod->file_size,
-            ]);
-
-            Log::info("[BatchDownload] Mod {$mod->workshop_id} downloaded successfully (disk: {$actualSize} bytes)");
-            ModDownloadOutput::dispatch($mod->id, 100, 'Download completed successfully.');
-        }
-    }
-
-    /**
-     * Mark all mods as failed after a SteamCMD batch download failure.
-     */
-    private function processFailedBatch(string $errorOutput): void
-    {
-        Log::error("[BatchDownload] Batch download failed: {$errorOutput}");
-
-        foreach ($this->mods as $mod) {
-            $mod->update(['installation_status' => InstallationStatus::Failed]);
-            ModDownloadOutput::dispatch($mod->id, 0, 'Batch download failed: '.$errorOutput);
         }
     }
 }

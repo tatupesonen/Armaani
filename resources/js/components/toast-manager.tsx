@@ -17,6 +17,7 @@ import {
 } from 'react';
 import type { ReactNode } from 'react';
 import echo from '@/echo';
+import { statusGradientColors } from '@/lib/server-status';
 import { serverStatusLabel } from '@/lib/utils';
 import type { ServerStatus } from '@/types/game';
 
@@ -81,21 +82,6 @@ const VariantIcon = ({ variant }: { variant: ToastVariant }) => {
         case 'warning':
             return <AlertTriangle className="size-5 shrink-0 text-amber-500" />;
     }
-};
-
-const statusGradients: Record<string, string> = {
-    starting:
-        'from-amber-400/20 to-zinc-300/5 dark:from-amber-500/15 dark:to-zinc-600/5',
-    booting:
-        'from-blue-400/20 to-zinc-300/5 dark:from-blue-500/15 dark:to-zinc-600/5',
-    downloading_mods:
-        'from-purple-400/20 to-zinc-300/5 dark:from-purple-500/15 dark:to-zinc-600/5',
-    running:
-        'from-emerald-400/20 to-zinc-300/5 dark:from-emerald-500/15 dark:to-zinc-600/5',
-    stopping:
-        'from-red-400/20 to-zinc-300/5 dark:from-red-500/15 dark:to-zinc-600/5',
-    crashed:
-        'from-red-500/25 to-zinc-300/5 dark:from-red-600/20 dark:to-zinc-600/5',
 };
 
 const statusSpinnerColors: Record<string, string> = {
@@ -355,7 +341,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                         }`}
                     >
                         {/* Gradient overlays — cross-fade on status change */}
-                        {Object.entries(statusGradients).map(
+                        {Object.entries(statusGradientColors).map(
                             ([status, gradient]) => (
                                 <div
                                     key={status}

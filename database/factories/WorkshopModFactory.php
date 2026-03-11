@@ -64,6 +64,11 @@ class WorkshopModFactory extends Factory
         ]);
     }
 
+    public function projectZomboid(): static
+    {
+        return $this->forGame('projectzomboid');
+    }
+
     public function dayz(): static
     {
         return $this->forGame('dayz');

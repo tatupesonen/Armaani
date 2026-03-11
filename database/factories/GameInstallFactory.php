@@ -71,4 +71,9 @@ class GameInstallFactory extends Factory
     {
         return $this->forGame('projectzomboid');
     }
+
+    public function factorio(): static
+    {
+        return $this->forGame('factorio');
+    }
 }

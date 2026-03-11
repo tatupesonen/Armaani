@@ -167,6 +167,8 @@ class GenerateGameTypesCommand extends Command
 
     /**
      * Resolve the TypeScript type for a schema field.
+     *
+     * @param  array<string, mixed>  $field
      */
     private function resolveFieldTsType(array $field): string
     {

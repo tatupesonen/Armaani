@@ -17,7 +17,7 @@ class ServerFactory extends Factory
      */
     public function definition(): array
     {
-        $port = fake()->numberBetween(2302, 2400);
+        $port = fake()->unique()->numberBetween(2302, 2400);
 
         return [
             'game_type' => 'arma3',

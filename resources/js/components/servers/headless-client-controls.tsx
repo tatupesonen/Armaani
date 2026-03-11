@@ -19,7 +19,10 @@ export default function HeadlessClientControls({
     const fetchCount = useCallback(() => {
         fetch(serverStatus.url(server.id))
             .then((res) => res.json())
-            .then((data) => setHcCount(data.headlessClientCount ?? 0));
+            .then((data) => setHcCount(data.headlessClientCount ?? 0))
+            .catch((error) => {
+                console.error('Failed to fetch headless client count:', error);
+            });
     }, [server.id]);
 
     useEffect(() => {

@@ -205,6 +205,9 @@ final class ReforgerHandler extends AbstractGameHandler implements DetectsServer
 
     // --- Validation ---
 
+    /**
+     * @return array<string, mixed>
+     */
     public function settingsValidationRules(): array
     {
         return [
@@ -231,6 +234,9 @@ final class ReforgerHandler extends AbstractGameHandler implements DetectsServer
         ];
     }
 
+    /**
+     * @param  array<string, mixed>  $validated
+     */
     public function syncPresetMods(ModPreset $preset, array $validated): void
     {
         $preset->reforgerMods()->sync($validated['reforger_mod_ids'] ?? []);
@@ -258,6 +264,9 @@ final class ReforgerHandler extends AbstractGameHandler implements DetectsServer
         return 'mod_preset_reforger_mod';
     }
 
+    /**
+     * @param  array<string, mixed>  $data
+     */
     public function storeRegisteredMod(array $data): Model
     {
         return ReforgerMod::query()->create($data);

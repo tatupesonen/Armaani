@@ -16,7 +16,6 @@ use App\Models\Arma3Settings;
 use App\Models\Server;
 use App\Services\Renderer\TwigConfigRenderer;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Validation\Rule;
 
 final class Arma3Handler extends AbstractGameHandler implements DetectsServerState, HasQueryPort, ManagesModAssets, SteamGameHandler, SupportsBackups, SupportsHeadlessClients, SupportsMissions, SupportsWorkshopMods
 {
@@ -476,19 +475,21 @@ final class Arma3Handler extends AbstractGameHandler implements DetectsServerSta
 
     // --- Validation ---
 
+    /**
+     * @return array<string, mixed>
+     */
     public function serverValidationRules(?Server $server = null): array
     {
         return [
-            'query_port' => [
-                'required', 'integer', 'min:1', 'max:65535',
-                Rule::unique('servers', 'query_port')->when($server, fn ($rule) => $rule->ignore($server->id)),
-                Rule::unique('servers', 'port')->when($server, fn ($rule) => $rule->ignore($server->id)),
-            ],
+            ...parent::serverValidationRules($server),
             'password' => ['nullable', 'string', 'max:255'],
             'additional_params' => ['nullable', 'string', 'max:1000'],
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function settingsValidationRules(): array
     {
         return [

@@ -32,6 +32,8 @@ interface SupportsRegisteredMods
 
     /**
      * Create a new registered mod from validated request data.
+     *
+     * @param  array<string, mixed>  $data
      */
     public function storeRegisteredMod(array $data): Model;
 

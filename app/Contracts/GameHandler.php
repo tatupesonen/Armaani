@@ -127,11 +127,15 @@ interface GameHandler
      * The optional $server parameter is provided during updates so that
      * unique rules can ignore the current server (e.g., query_port uniqueness).
      * On store, $server is null.
+     *
+     * @return array<string, mixed>
      */
     public function serverValidationRules(?Server $server = null): array;
 
     /**
      * Validation rules for game-specific settings (difficulty, network, reforger settings, etc.)
+     *
+     * @return array<string, mixed>
      */
     public function settingsValidationRules(): array;
 
@@ -185,6 +189,8 @@ interface GameHandler
     /**
      * Update game-specific related settings from validated request data.
      * Called from ServerController::update().
+     *
+     * @param  array<string, mixed>  $validated
      */
     public function updateRelatedSettings(Server $server, array $validated): void;
 
@@ -203,6 +209,8 @@ interface GameHandler
     /**
      * Sync a preset's mods from validated request data.
      * Each handler knows which relationships to sync.
+     *
+     * @param  array<string, mixed>  $validated
      */
     public function syncPresetMods(ModPreset $preset, array $validated): void;
 

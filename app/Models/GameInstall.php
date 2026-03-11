@@ -43,6 +43,7 @@ class GameInstall extends Model
 
     /**
      * @param  Builder<GameInstall>  $query
+     * @return Builder<GameInstall>
      */
     public function scopeForGame(Builder $query, string $gameType): Builder
     {

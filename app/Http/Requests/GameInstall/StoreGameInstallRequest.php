@@ -17,12 +17,18 @@ class StoreGameInstallRequest extends FormRequest
     public function rules(): array
     {
         $gameManager = app(GameManager::class);
-        $handler = $gameManager->driver($this->input('game_type'));
+
+        try {
+            $handler = $gameManager->driver($this->input('game_type'));
+            $branches = $handler->branches();
+        } catch (\InvalidArgumentException) {
+            $branches = [];
+        }
 
         return [
             'game_type' => ['required', Rule::in($gameManager->availableTypes())],
             'name' => ['required', 'string', 'max:255'],
-            'branch' => ['required', 'string', Rule::in($handler->branches())],
+            'branch' => ['required', 'string', Rule::in($branches)],
         ];
     }
 }

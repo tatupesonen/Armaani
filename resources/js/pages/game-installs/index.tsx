@@ -1,19 +1,10 @@
-import { Head, router, useForm, usePage } from '@inertiajs/react';
+import { Head, router, useForm, usePage, usePoll } from '@inertiajs/react';
 import { Download, Plus, RotateCw, Terminal, Trash2 } from 'lucide-react';
 import { useState } from 'react';
+import ConfirmDeleteDialog from '@/components/confirm-delete-dialog';
 import Heading from '@/components/heading';
 import LogViewer from '@/components/log-viewer';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -54,6 +45,9 @@ export default function GameInstallsIndex({ installs, gameTypes }: Props) {
     const [deletingInstallId, setDeletingInstallId] = useState<number | null>(
         null,
     );
+    const [reinstallingInstallId, setReinstallingInstallId] = useState<
+        number | null
+    >(null);
 
     const shouldPoll = installs.some(
         (i) =>
@@ -61,12 +55,7 @@ export default function GameInstallsIndex({ installs, gameTypes }: Props) {
             i.installation_status === 'queued',
     );
 
-    // Poll for updates when installs are in progress
-    if (shouldPoll) {
-        setTimeout(() => {
-            router.reload({ only: ['installs'] });
-        }, 5000);
-    }
+    usePoll(5000, { only: ['installs'] }, { autoStart: shouldPoll });
 
     const createForm = useForm({
         game_type: (gameTypes[0]?.value ?? '') as string,
@@ -106,16 +95,19 @@ export default function GameInstallsIndex({ installs, gameTypes }: Props) {
         });
     }
 
-    function handleReinstall(install: GameInstall) {
-        if (
-            !confirm(
-                'Re-install/update this game install? The queue will start a fresh SteamCMD run.',
-            )
-        ) {
+    function handleReinstall() {
+        if (reinstallingInstallId === null) {
             return;
         }
 
-        router.post(reinstall.url(install.id), {}, { preserveScroll: true });
+        router.post(
+            reinstall.url(reinstallingInstallId),
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: () => setReinstallingInstallId(null),
+            },
+        );
     }
 
     function handleDelete() {
@@ -158,7 +150,9 @@ export default function GameInstallsIndex({ installs, gameTypes }: Props) {
                             <InstallCard
                                 key={install.id}
                                 install={install}
-                                onReinstall={handleReinstall}
+                                onReinstall={(id) =>
+                                    setReinstallingInstallId(id)
+                                }
                                 onDelete={(id) => setDeletingInstallId(id)}
                             />
                         ))}
@@ -263,31 +257,25 @@ export default function GameInstallsIndex({ installs, gameTypes }: Props) {
                 </DialogContent>
             </Dialog>
 
+            {/* Reinstall Confirmation */}
+            <ConfirmDeleteDialog
+                open={reinstallingInstallId !== null}
+                onOpenChange={(open) => !open && setReinstallingInstallId(null)}
+                onConfirm={handleReinstall}
+                title="Re-install Game"
+                description="Re-install/update this game install? The queue will start a fresh SteamCMD run."
+                confirmLabel="Re-install"
+                confirmVariant="default"
+            />
+
             {/* Delete Confirmation */}
-            <AlertDialog
+            <ConfirmDeleteDialog
                 open={deletingInstallId !== null}
                 onOpenChange={(open) => !open && setDeletingInstallId(null)}
-            >
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Game Install</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Are you sure you want to delete this game install?
-                            This will also permanently remove all server files
-                            from disk.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={handleDelete}
-                            variant="destructive"
-                        >
-                            Delete
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+                onConfirm={handleDelete}
+                title="Delete Game Install"
+                description="Are you sure you want to delete this game install? This will also permanently remove all server files from disk."
+            />
         </AppLayout>
     );
 }
@@ -298,7 +286,7 @@ function InstallCard({
     onDelete,
 }: {
     install: GameInstall;
-    onReinstall: (install: GameInstall) => void;
+    onReinstall: (id: number) => void;
     onDelete: (id: number) => void;
 }) {
     const { gameTypeLabels } = usePage().props;
@@ -396,7 +384,7 @@ function InstallCard({
                         <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => onReinstall(install)}
+                            onClick={() => onReinstall(install.id)}
                         >
                             <RotateCw className="mr-2 size-4" />
                             {install.installation_status === 'installed'

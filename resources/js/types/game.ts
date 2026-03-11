@@ -122,6 +122,7 @@ export type GameModSections = {
 
 export type RegisteredMod = {
     id: number;
+    mod_id: string;
     name: string;
     [key: string]: unknown;
 };

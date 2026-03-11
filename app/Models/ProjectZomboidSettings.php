@@ -59,6 +59,7 @@ class ProjectZomboidSettings extends Model
             'sleep_needed' => 'boolean',
             'announce_death' => 'boolean',
             'do_lua_checksum' => 'boolean',
+            'max_accounts_per_user' => 'integer',
             'login_queue_enabled' => 'boolean',
             'deny_login_on_overloaded_server' => 'boolean',
         ];

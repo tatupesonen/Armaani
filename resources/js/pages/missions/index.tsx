@@ -1,18 +1,9 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import { Download, Trash2, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
+import ConfirmDeleteDialog from '@/components/confirm-delete-dialog';
 import Heading from '@/components/heading';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import AppLayout from '@/layouts/app-layout';
@@ -162,29 +153,13 @@ export default function MissionsIndex({ missions }: Props) {
                 )}
             </div>
 
-            <AlertDialog
+            <ConfirmDeleteDialog
                 open={deletingFilename !== null}
                 onOpenChange={(open) => !open && setDeletingFilename(null)}
-            >
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Mission</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Are you sure you want to delete "{deletingFilename}
-                            "?
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={handleDelete}
-                            variant="destructive"
-                        >
-                            Delete
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+                onConfirm={handleDelete}
+                title="Delete Mission"
+                description={`Are you sure you want to delete "${deletingFilename}"?`}
+            />
         </AppLayout>
     );
 }

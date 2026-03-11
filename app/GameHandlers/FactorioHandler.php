@@ -284,19 +284,21 @@ final class FactorioHandler extends AbstractGameHandler implements DetectsServer
 
     // --- Validation ---
 
+    /**
+     * @return array<string, mixed>
+     */
     public function serverValidationRules(?Server $server = null): array
     {
         return [
-            'query_port' => [
-                'required', 'integer', 'min:1', 'max:65535',
-                \Illuminate\Validation\Rule::unique('servers', 'query_port')->when($server, fn ($rule) => $rule->ignore($server->id)),
-                \Illuminate\Validation\Rule::unique('servers', 'port')->when($server, fn ($rule) => $rule->ignore($server->id)),
-            ],
+            ...parent::serverValidationRules($server),
             'password' => ['nullable', 'string', 'max:255'],
             'additional_params' => ['nullable', 'string', 'max:1000'],
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function settingsValidationRules(): array
     {
         $scaleRule = 'in:none,very-low,low,normal,high,very-high';

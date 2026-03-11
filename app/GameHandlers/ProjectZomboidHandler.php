@@ -168,6 +168,9 @@ final class ProjectZomboidHandler extends AbstractGameHandler implements Detects
 
     // --- Validation ---
 
+    /**
+     * @return array<string, mixed>
+     */
     public function serverValidationRules(?Server $server = null): array
     {
         return [
@@ -176,6 +179,9 @@ final class ProjectZomboidHandler extends AbstractGameHandler implements Detects
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function settingsValidationRules(): array
     {
         return [

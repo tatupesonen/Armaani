@@ -8,16 +8,7 @@ import {
     Upload,
 } from 'lucide-react';
 import { useRef, useState } from 'react';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import ConfirmDeleteDialog from '@/components/confirm-delete-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -305,27 +296,15 @@ export default function BackupSection({ server }: BackupSectionProps) {
             </div>
 
             {/* Restore confirmation */}
-            <AlertDialog
+            <ConfirmDeleteDialog
                 open={restoringBackupId !== null}
                 onOpenChange={(o) => !o && setRestoringBackupId(null)}
-            >
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Restore Backup</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Are you sure you want to restore this backup? This
-                            will overwrite the server's current profile state.
-                            The server must be stopped.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleRestore}>
-                            Restore
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+                onConfirm={handleRestore}
+                title="Restore Backup"
+                description="Are you sure you want to restore this backup? This will overwrite the server's current profile state. The server must be stopped."
+                confirmLabel="Restore"
+                confirmVariant="default"
+            />
         </>
     );
 }

@@ -6,6 +6,7 @@ use App\Contracts\GameHandler;
 use App\Contracts\SupportsRegisteredMods;
 use App\Enums\InstallationStatus;
 use App\GameManager;
+use App\Http\Requests\WorkshopMod\IndexWorkshopModRequest;
 use App\Http\Requests\WorkshopMod\StoreWorkshopModRequest;
 use App\Http\Requests\WorkshopMod\UpdateSelectedModsRequest;
 use App\Jobs\BatchDownloadModsJob;
@@ -15,7 +16,6 @@ use App\Services\Steam\SteamWorkshopService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
@@ -27,20 +27,21 @@ class WorkshopModController extends Controller
         private GameManager $gameManager,
     ) {}
 
-    public function index(Request $request): Response
+    public function index(IndexWorkshopModRequest $request): Response
     {
+        $validated = $request->validated();
         $query = WorkshopMod::query();
 
-        if ($request->filled('search')) {
-            $search = $request->input('search');
+        if (! empty($validated['search'])) {
+            $search = $validated['search'];
             $query->where(function ($q) use ($search): void {
                 $q->where('name', 'like', "%{$search}%")
                     ->orWhere('workshop_id', 'like', "%{$search}%");
             });
         }
 
-        if ($request->filled('sort_by')) {
-            $query->orderBy($request->input('sort_by'), $request->input('sort_direction', 'asc'));
+        if (! empty($validated['sort_by'])) {
+            $query->orderBy($validated['sort_by'], $validated['sort_direction'] ?? 'asc');
         } else {
             $query->orderBy('name');
         }
@@ -76,7 +77,7 @@ class WorkshopModController extends Controller
             'mods' => $mods,
             'registeredMods' => $registeredMods,
             'modSections' => $modSections,
-            'filters' => $request->only(['search', 'sort_by', 'sort_direction']),
+            'filters' => array_filter($validated, fn ($v) => $v !== null),
             'installedStats' => [
                 'count' => (int) $installedStats->count,
                 'total_size' => (int) $installedStats->total_size,

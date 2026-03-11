@@ -3,9 +3,11 @@
 namespace App\GameHandlers;
 
 use App\Contracts\GameHandler;
+use App\Contracts\HasQueryPort;
 use App\Models\ModPreset;
 use App\Models\Server;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Validation\Rule;
 
 abstract class AbstractGameHandler implements GameHandler
 {
@@ -65,11 +67,27 @@ abstract class AbstractGameHandler implements GameHandler
     // Default Implementations (override as needed)
     // ---------------------------------------------------------------
 
+    /**
+     * @return array<string, mixed>
+     */
     public function serverValidationRules(?Server $server = null): array
     {
-        return [];
+        $rules = [];
+
+        if ($this instanceof HasQueryPort) {
+            $rules['query_port'] = [
+                'required', 'integer', 'min:1', 'max:65535',
+                Rule::unique('servers', 'query_port')->when($server, fn ($rule) => $rule->ignore($server->id)),
+                Rule::unique('servers', 'port')->when($server, fn ($rule) => $rule->ignore($server->id)),
+            ];
+        }
+
+        return $rules;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function settingsValidationRules(): array
     {
         return [];
@@ -89,6 +107,9 @@ abstract class AbstractGameHandler implements GameHandler
         $this->settingsModelClass::query()->create(['server_id' => $server->id]);
     }
 
+    /**
+     * @param  array<string, mixed>  $validated
+     */
     public function updateRelatedSettings(Server $server, array $validated): void
     {
         if ($this->settingsRelationName === null || $this->settingsModelClass === null) {
@@ -115,6 +136,9 @@ abstract class AbstractGameHandler implements GameHandler
         return [];
     }
 
+    /**
+     * @param  array<string, mixed>  $validated
+     */
     public function syncPresetMods(ModPreset $preset, array $validated): void
     {
         // No-op for handlers without mod support.

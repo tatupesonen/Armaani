@@ -1,18 +1,9 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { FileUp, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useRef, useState } from 'react';
+import ConfirmDeleteDialog from '@/components/confirm-delete-dialog';
 import Heading from '@/components/heading';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -189,29 +180,13 @@ export default function PresetsIndex({ presets }: Props) {
             </Dialog>
 
             {/* Delete Confirmation */}
-            <AlertDialog
+            <ConfirmDeleteDialog
                 open={deletingPresetId !== null}
                 onOpenChange={(open) => !open && setDeletingPresetId(null)}
-            >
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Preset</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Are you sure? This will not delete the mods
-                            themselves.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={handleDelete}
-                            variant="destructive"
-                        >
-                            Delete
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+                onConfirm={handleDelete}
+                title="Delete Preset"
+                description="Are you sure? This will not delete the mods themselves."
+            />
         </AppLayout>
     );
 }

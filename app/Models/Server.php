@@ -17,12 +17,12 @@ use Illuminate\Support\Facades\Log;
  *
  * Dynamic relationships registered by GameServiceProvider via resolveRelationUsing:
  *
- * @method \Illuminate\Database\Eloquent\Relations\HasOne arma3Settings()
- * @method \Illuminate\Database\Eloquent\Relations\HasOne reforgerSettings()
- * @method \Illuminate\Database\Eloquent\Relations\HasOne dayzSettings()
- * @method \Illuminate\Database\Eloquent\Relations\HasOne projectzomboidSettings()
- * @method \Illuminate\Database\Eloquent\Relations\HasOne factorioSettings()
- * @method \Illuminate\Database\Eloquent\Relations\HasMany reforgerScenarios()
+ * @method \Illuminate\Database\Eloquent\Relations\HasOne<\App\Models\Arma3Settings, $this> arma3Settings()
+ * @method \Illuminate\Database\Eloquent\Relations\HasOne<\App\Models\ReforgerSettings, $this> reforgerSettings()
+ * @method \Illuminate\Database\Eloquent\Relations\HasOne<\App\Models\DayZSettings, $this> dayzSettings()
+ * @method \Illuminate\Database\Eloquent\Relations\HasOne<\App\Models\ProjectZomboidSettings, $this> projectzomboidSettings()
+ * @method \Illuminate\Database\Eloquent\Relations\HasOne<\App\Models\FactorioSettings, $this> factorioSettings()
+ * @method \Illuminate\Database\Eloquent\Relations\HasMany<\App\Models\ReforgerScenario, $this> reforgerScenarios()
  *
  * @property \App\Models\Arma3Settings|null $arma3Settings
  * @property \App\Models\ReforgerSettings|null $reforgerSettings
@@ -61,6 +61,9 @@ class Server extends Model
     protected function casts(): array
     {
         return [
+            'port' => 'integer',
+            'query_port' => 'integer',
+            'max_players' => 'integer',
             'status' => ServerStatus::class,
             'auto_restart' => 'boolean',
         ];
@@ -86,6 +89,7 @@ class Server extends Model
 
     /**
      * @param  Builder<Server>  $query
+     * @return Builder<Server>
      */
     public function scopeForGame(Builder $query, string $gameType): Builder
     {

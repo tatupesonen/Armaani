@@ -78,6 +78,7 @@ class WorkshopMod extends Model
 
     /**
      * @param  Builder<WorkshopMod>  $query
+     * @return Builder<WorkshopMod>
      */
     public function scopeForGame(Builder $query, string $gameType): Builder
     {

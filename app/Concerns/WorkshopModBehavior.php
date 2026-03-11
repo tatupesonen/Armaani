@@ -32,6 +32,9 @@ trait WorkshopModBehavior
         ];
     }
 
+    /**
+     * @param  array<string, mixed>  $validated
+     */
     public function syncPresetMods(ModPreset $preset, array $validated): void
     {
         $preset->mods()->sync($validated['mod_ids'] ?? []);
