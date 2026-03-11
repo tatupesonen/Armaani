@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.6.2](https://github.com/tatupesonen/Armaani/compare/v1.6.1...v1.6.2) (2026-03-11)
+
+
+### Bug Fixes
+
+* allow nullable scenario_id for Reforger servers ([#23](https://github.com/tatupesonen/Armaani/issues/23)) ([266f475](https://github.com/tatupesonen/Armaani/commit/266f475cb1a3192f446c32194a14e485759cca05))
+* allow nullable scenario_id for Reforger servers ([#23](https://github.com/tatupesonen/Armaani/issues/23)) ([a6fcb39](https://github.com/tatupesonen/Armaani/commit/a6fcb398c4c08005d60270d75643eb0fb0d6b005))
+
 ## [1.6.1](https://github.com/tatupesonen/Armaani/compare/v1.6.0...v1.6.1) (2026-03-10)
 
 
