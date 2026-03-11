@@ -103,10 +103,9 @@ FROM build AS test
 # Recreate .env (removed at end of build stage) and re-install with dev deps
 RUN cp .env.example .env \
     && php -r "echo 'APP_KEY=base64:' . base64_encode(random_bytes(32)) . PHP_EOL;" >> .env \
-    && composer install --optimize-autoloader \
-    && php artisan optimize:clear
+    && composer install --optimize-autoloader
 
-CMD ["php", "artisan", "test", "--compact", "--parallel"]
+CMD ["php", "artisan", "test", "--compact"]
 
 # =============================================================================
 # Stage 3: Final runtime (base + built app, no Node)
