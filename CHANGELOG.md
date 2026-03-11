@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.1](https://github.com/tatupesonen/Armaani/compare/v1.7.0...v1.7.1) (2026-03-11)
+
+
+### Bug Fixes
+
+* update release script, check for app version on boot ([177f842](https://github.com/tatupesonen/Armaani/commit/177f842969eb0130bcc6674815a843e180a64b64))
+
 ## [1.7.0](https://github.com/tatupesonen/Armaani/compare/v1.6.2...v1.7.0) (2026-03-11)
 
 
