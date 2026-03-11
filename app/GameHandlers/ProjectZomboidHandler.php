@@ -126,6 +126,7 @@ final class ProjectZomboidHandler extends AbstractGameHandler implements Detects
                 'showOnCreate' => true,
                 'createLabel' => 'Project Zomboid Options',
                 'fields' => [
+                    ['key' => 'query_port', 'label' => 'Steam Query Port', 'type' => 'number', 'default' => $this->defaultQueryPort(), 'min' => 1, 'max' => 65535, 'description' => 'Steam server browser query port. Typically game port + 1.', 'source' => 'server'],
                     ['key' => 'password', 'label' => 'Server Password', 'type' => 'text', 'default' => '', 'placeholder' => 'Leave empty for no password', 'source' => 'server'],
                     ['key' => 'admin_password', 'label' => 'Admin Password', 'type' => 'text', 'default' => '', 'placeholder' => 'Required for server startup', 'required' => true, 'source' => 'projectzomboid_settings'],
                     ['type' => 'separator'],

@@ -190,8 +190,10 @@ final class ReforgerHandler extends AbstractGameHandler implements DetectsServer
         return [
             [
                 'title' => 'Reforger Settings',
+                'showOnCreate' => true,
                 'source' => 'reforger_settings',
                 'fields' => [
+                    ['key' => 'query_port', 'label' => 'Steam Query Port', 'type' => 'number', 'default' => $this->defaultQueryPort(), 'min' => 1, 'max' => 65535, 'description' => 'Steam server browser query port. Typically game port + 1.', 'source' => 'server'],
                     ['key' => 'scenario_id', 'label' => 'Scenario ID', 'type' => 'custom', 'component' => 'scenario-picker', 'default' => ''],
                     ['key' => 'admin_password', 'label' => 'Admin Password', 'type' => 'text', 'default' => '', 'placeholder' => 'In-game admin password'],
                     ['key' => 'third_person_view_enabled', 'label' => 'Third Person View', 'type' => 'toggle', 'default' => true],
