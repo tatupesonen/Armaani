@@ -269,8 +269,7 @@ class ServerProcessServiceTest extends TestCase
     {
         $server = $this->makeServer();
 
-        Arma3Settings::factory()->create([
-            'server_id' => $server->id,
+        $server->arma3Settings()->update([
             'max_msg_send' => 2048,
             'max_size_guaranteed' => 1024,
             'max_size_nonguaranteed' => 512,
@@ -325,8 +324,7 @@ class ServerProcessServiceTest extends TestCase
     {
         $server = $this->makeServer();
 
-        Arma3Settings::factory()->create([
-            'server_id' => $server->id,
+        $server->arma3Settings()->update([
             'view_distance' => 0,
         ]);
         $server->refresh();
@@ -344,8 +342,7 @@ class ServerProcessServiceTest extends TestCase
     {
         $server = $this->makeServer();
 
-        Arma3Settings::factory()->create([
-            'server_id' => $server->id,
+        $server->arma3Settings()->update([
             'view_distance' => 3000,
         ]);
         $server->refresh();
@@ -834,9 +831,21 @@ class ServerProcessServiceTest extends TestCase
 
         $gameInstall = GameInstall::factory()->installed()->create();
 
-        return Server::factory()->create(array_merge(
+        // Separate settings-level attributes from server-level attributes
+        $settingsKeys = ['admin_password', 'verify_signatures', 'allowed_file_patching', 'battle_eye', 'persistent', 'von_enabled', 'additional_server_options'];
+        $settingsOverrides = array_intersect_key($attributes, array_flip($settingsKeys));
+        $serverAttributes = array_diff_key($attributes, $settingsOverrides);
+
+        $server = Server::factory()->create(array_merge(
             ['game_install_id' => $gameInstall->id],
-            $attributes
+            $serverAttributes
         ));
+
+        Arma3Settings::factory()->create(array_merge(
+            ['server_id' => $server->id],
+            $settingsOverrides
+        ));
+
+        return $server->refresh();
     }
 }

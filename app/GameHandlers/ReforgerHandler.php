@@ -4,6 +4,7 @@ namespace App\GameHandlers;
 
 use App\Contracts\DetectsServerState;
 use App\Contracts\GameHandler;
+use App\Contracts\HasQueryPort;
 use App\Contracts\SteamGameHandler;
 use App\Contracts\SupportsRegisteredMods;
 use App\Contracts\SupportsScenarios;
@@ -16,7 +17,7 @@ use App\Services\Mod\ReforgerScenarioService;
 use App\Services\Renderer\JsonConfigRenderer;
 use Illuminate\Database\Eloquent\Model;
 
-final class ReforgerHandler implements DetectsServerState, GameHandler, SteamGameHandler, SupportsRegisteredMods, SupportsScenarios, WritesNativeLogs
+final class ReforgerHandler implements DetectsServerState, GameHandler, HasQueryPort, SteamGameHandler, SupportsRegisteredMods, SupportsScenarios, WritesNativeLogs
 {
     public function __construct(
         protected JsonConfigRenderer $configRenderer,
@@ -121,7 +122,7 @@ final class ReforgerHandler implements DetectsServerState, GameHandler, SteamGam
             'game' => [
                 'name' => $server->name,
                 'password' => (string) $server->password,
-                'passwordAdmin' => (string) $server->admin_password,
+                'passwordAdmin' => (string) ($settings?->admin_password ?? ''),
                 'scenarioId' => $settings?->scenario_id ?? '',
                 'maxPlayers' => (int) $server->max_players,
                 'visible' => true,
@@ -132,7 +133,7 @@ final class ReforgerHandler implements DetectsServerState, GameHandler, SteamGam
                     'networkViewDistance' => 1000,
                     'disableThirdPerson' => ! $thirdPersonEnabled,
                     'fastValidation' => true,
-                    'battlEye' => $server->battle_eye,
+                    'battlEye' => $settings?->battle_eye ?? true,
                     'VONDisableUI' => true,
                     'VONDisableDirectSpeechUI' => true,
                 ],
@@ -216,8 +217,9 @@ final class ReforgerHandler implements DetectsServerState, GameHandler, SteamGam
                 'source' => 'reforger_settings',
                 'fields' => [
                     ['key' => 'scenario_id', 'label' => 'Scenario ID', 'type' => 'custom', 'component' => 'scenario-picker', 'default' => ''],
+                    ['key' => 'admin_password', 'label' => 'Admin Password', 'type' => 'text', 'default' => '', 'placeholder' => 'In-game admin password'],
                     ['key' => 'third_person_view_enabled', 'label' => 'Third Person View', 'type' => 'toggle', 'default' => true],
-                    ['key' => 'battle_eye', 'label' => 'BattlEye Anti-Cheat', 'type' => 'toggle', 'default' => true, 'source' => 'server'],
+                    ['key' => 'battle_eye', 'label' => 'BattlEye Anti-Cheat', 'type' => 'toggle', 'default' => true],
                     ['key' => 'cross_platform', 'label' => 'Cross-Platform', 'type' => 'toggle', 'default' => false],
                     ['key' => 'max_fps', 'label' => 'Max FPS', 'type' => 'number', 'default' => 60, 'min' => 10, 'max' => 240, 'description' => 'Recommended: 60-120. Limits server tick rate to prevent excessive CPU usage.'],
                 ],
@@ -229,14 +231,14 @@ final class ReforgerHandler implements DetectsServerState, GameHandler, SteamGam
 
     public function serverValidationRules(?Server $server = null): array
     {
-        return [
-            'battle_eye' => ['boolean'],
-        ];
+        return [];
     }
 
     public function settingsValidationRules(): array
     {
         return [
+            'admin_password' => ['nullable', 'string', 'max:255'],
+            'battle_eye' => ['boolean'],
             'scenario_id' => ['nullable', 'string', 'regex:/^\{[0-9A-F]{16}\}[a-zA-Z0-9_.\/ -]+$/'],
             'third_person_view_enabled' => ['boolean'],
             'max_fps' => ['integer', 'min:10', 'max:240'],

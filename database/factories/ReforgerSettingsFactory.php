@@ -17,6 +17,8 @@ class ReforgerSettingsFactory extends Factory
     {
         return [
             'server_id' => Server::factory()->forReforger(),
+            'admin_password' => null,
+            'battle_eye' => true,
             'scenario_id' => '{ECC61978EDCC2B5A}Missions/23_Campaign.conf',
             'third_person_view_enabled' => true,
             'cross_platform' => false,

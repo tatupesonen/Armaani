@@ -18,6 +18,7 @@ class ProjectZomboidSettings extends Model
      */
     protected $fillable = [
         'server_id',
+        'admin_password',
         'pvp',
         'pause_empty',
         'global_chat',

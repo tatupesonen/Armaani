@@ -173,7 +173,9 @@ class ProjectZomboidHandlerTest extends TestCase
 
     public function test_build_launch_command_includes_servername_and_cachedir(): void
     {
-        $server = $this->createProjectZomboidServer(['admin_password' => 'secret123']);
+        $server = $this->createProjectZomboidServer();
+        $server->projectzomboidSettings()->update(['admin_password' => 'secret123']);
+        $server->refresh();
 
         $command = $this->handler->buildLaunchCommand($server);
 
@@ -344,9 +346,15 @@ class ProjectZomboidHandlerTest extends TestCase
         $rules = $this->handler->serverValidationRules();
 
         $this->assertArrayHasKey('password', $rules);
+        $this->assertArrayHasKey('additional_params', $rules);
+    }
+
+    public function test_settings_validation_rules_includes_admin_password(): void
+    {
+        $rules = $this->handler->settingsValidationRules();
+
         $this->assertArrayHasKey('admin_password', $rules);
         $this->assertContains('required', $rules['admin_password']);
-        $this->assertArrayHasKey('additional_params', $rules);
     }
 
     public function test_settings_schema_has_expected_sections(): void

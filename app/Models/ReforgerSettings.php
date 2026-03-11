@@ -13,6 +13,8 @@ class ReforgerSettings extends Model
 
     protected $fillable = [
         'server_id',
+        'admin_password',
+        'battle_eye',
         'scenario_id',
         'third_person_view_enabled',
         'backend_log_enabled',
@@ -26,6 +28,7 @@ class ReforgerSettings extends Model
     protected function casts(): array
     {
         return [
+            'battle_eye' => 'boolean',
             'third_person_view_enabled' => 'boolean',
             'backend_log_enabled' => 'boolean',
             'max_fps' => 'integer',

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Server;
 
+use App\Contracts\DetectsServerState;
 use App\GameManager;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -26,6 +27,7 @@ class UpdateServerRequest extends FormRequest
             'description' => ['nullable', 'string', 'max:1000'],
             'active_preset_id' => ['nullable', 'exists:mod_presets,id'],
             'game_install_id' => ['required', 'exists:game_installs,id'],
+            ...($handler instanceof DetectsServerState ? ['auto_restart' => ['boolean']] : []),
             ...$handler->serverValidationRules($server),
             ...$handler->settingsValidationRules(),
         ];

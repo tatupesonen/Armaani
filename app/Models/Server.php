@@ -43,24 +43,16 @@ class Server extends Model
         'query_port',
         'max_players',
         'password',
-        'admin_password',
         'description',
         'active_preset_id',
         'game_install_id',
         'status',
         'additional_params',
-        'verify_signatures',
-        'allowed_file_patching',
-        'battle_eye',
-        'persistent',
-        'von_enabled',
-        'additional_server_options',
         'auto_restart',
     ];
 
     protected $hidden = [
         'password',
-        'admin_password',
     ];
 
     /**
@@ -70,11 +62,6 @@ class Server extends Model
     {
         return [
             'status' => ServerStatus::class,
-            'verify_signatures' => 'boolean',
-            'allowed_file_patching' => 'boolean',
-            'battle_eye' => 'boolean',
-            'persistent' => 'boolean',
-            'von_enabled' => 'boolean',
             'auto_restart' => 'boolean',
         ];
     }

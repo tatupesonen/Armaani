@@ -5,6 +5,7 @@ namespace App\GameHandlers;
 use App\Contracts\DetectsServerState;
 use App\Contracts\DownloadsDirectly;
 use App\Contracts\GameHandler;
+use App\Contracts\HasQueryPort;
 use App\Models\FactorioSettings;
 use App\Models\ModPreset;
 use App\Models\Server;
@@ -12,7 +13,7 @@ use App\Services\Renderer\JsonConfigRenderer;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 
-final class FactorioHandler implements DetectsServerState, DownloadsDirectly, GameHandler
+final class FactorioHandler implements DetectsServerState, DownloadsDirectly, GameHandler, HasQueryPort
 {
     public function __construct(
         protected JsonConfigRenderer $configRenderer,

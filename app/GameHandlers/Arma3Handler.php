@@ -4,6 +4,7 @@ namespace App\GameHandlers;
 
 use App\Contracts\DetectsServerState;
 use App\Contracts\GameHandler;
+use App\Contracts\HasQueryPort;
 use App\Contracts\ManagesModAssets;
 use App\Contracts\SteamGameHandler;
 use App\Contracts\SupportsBackups;
@@ -16,7 +17,7 @@ use App\Services\Renderer\TwigConfigRenderer;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 
-final class Arma3Handler implements DetectsServerState, GameHandler, ManagesModAssets, SteamGameHandler, SupportsBackups, SupportsHeadlessClients, SupportsMissions
+final class Arma3Handler implements DetectsServerState, GameHandler, HasQueryPort, ManagesModAssets, SteamGameHandler, SupportsBackups, SupportsHeadlessClients, SupportsMissions
 {
     public function __construct(
         protected TwigConfigRenderer $configRenderer,
@@ -310,10 +311,10 @@ final class Arma3Handler implements DetectsServerState, GameHandler, ManagesModA
                 'title' => 'Server Rules',
                 'showOnCreate' => true,
                 'createLabel' => 'Arma 3 Options',
-                'source' => 'server',
+                'source' => 'arma3_settings',
                 'fields' => [
-                    ['key' => 'query_port', 'label' => 'Steam Query Port', 'type' => 'number', 'default' => $this->defaultQueryPort(), 'min' => 1, 'max' => 65535, 'description' => 'Steam server browser query port. Typically game port + 1.'],
-                    ['key' => 'password', 'label' => 'Server Password', 'type' => 'text', 'default' => '', 'placeholder' => 'Leave empty for no password'],
+                    ['key' => 'query_port', 'label' => 'Steam Query Port', 'type' => 'number', 'default' => $this->defaultQueryPort(), 'min' => 1, 'max' => 65535, 'description' => 'Steam server browser query port. Typically game port + 1.', 'source' => 'server'],
+                    ['key' => 'password', 'label' => 'Server Password', 'type' => 'text', 'default' => '', 'placeholder' => 'Leave empty for no password', 'source' => 'server'],
                     ['key' => 'admin_password', 'label' => 'Admin Password', 'type' => 'text', 'default' => '', 'placeholder' => 'In-game admin password'],
                     ['type' => 'separator'],
                     ['key' => 'verify_signatures', 'label' => 'Verify Signatures', 'type' => 'toggle', 'default' => true],
@@ -321,7 +322,6 @@ final class Arma3Handler implements DetectsServerState, GameHandler, ManagesModA
                     ['key' => 'battle_eye', 'label' => 'BattlEye Anti-Cheat', 'type' => 'toggle', 'default' => true],
                     ['key' => 'von_enabled', 'label' => 'Voice Over Network', 'type' => 'toggle', 'default' => true],
                     ['key' => 'persistent', 'label' => 'Persistent Server', 'type' => 'toggle', 'default' => false],
-                    ['key' => 'auto_restart', 'label' => 'Auto-Restart on Crash', 'type' => 'toggle', 'default' => false],
                 ],
             ],
 
@@ -478,7 +478,7 @@ final class Arma3Handler implements DetectsServerState, GameHandler, ManagesModA
                 'advanced' => true,
                 'fields' => [
                     ['key' => 'additional_params', 'label' => 'Additional Launch Parameters', 'type' => 'textarea', 'default' => '', 'rows' => 2, 'placeholder' => '-loadMissionToMemory -enableHT', 'source' => 'server'],
-                    ['key' => 'additional_server_options', 'label' => 'Additional server.cfg Options', 'type' => 'textarea', 'default' => '', 'rows' => 3, 'placeholder' => 'Raw config directives appended to server.cfg'],
+                    ['key' => 'additional_server_options', 'label' => 'Additional server.cfg Options', 'type' => 'textarea', 'default' => '', 'rows' => 3, 'placeholder' => 'Raw config directives appended to server.cfg', 'source' => 'arma3_settings'],
                 ],
             ],
         ];
@@ -502,21 +502,22 @@ final class Arma3Handler implements DetectsServerState, GameHandler, ManagesModA
                 Rule::unique('servers', 'port')->when($server, fn ($rule) => $rule->ignore($server->id)),
             ],
             'password' => ['nullable', 'string', 'max:255'],
-            'admin_password' => ['nullable', 'string', 'max:255'],
-            'auto_restart' => ['boolean'],
-            'verify_signatures' => ['boolean'],
-            'allowed_file_patching' => ['boolean'],
-            'battle_eye' => ['boolean'],
-            'persistent' => ['boolean'],
-            'von_enabled' => ['boolean'],
             'additional_params' => ['nullable', 'string', 'max:1000'],
-            'additional_server_options' => ['nullable', 'string'],
         ];
     }
 
     public function settingsValidationRules(): array
     {
         return [
+            // Server options (on arma3_settings)
+            'admin_password' => ['nullable', 'string', 'max:255'],
+            'verify_signatures' => ['boolean'],
+            'allowed_file_patching' => ['boolean'],
+            'battle_eye' => ['boolean'],
+            'persistent' => ['boolean'],
+            'von_enabled' => ['boolean'],
+            'additional_server_options' => ['nullable', 'string'],
+
             // Difficulty settings
             'reduced_damage' => ['boolean'],
             'group_indicators' => ['integer', 'between:0,2'],
@@ -636,21 +637,22 @@ final class Arma3Handler implements DetectsServerState, GameHandler, ManagesModA
     protected function generateServerConfig(Server $server): void
     {
         $renderer = $this->configRenderer;
+        $settings = $server->arma3Settings ?? $this->getDefaultSettings();
 
         $content = $renderer->render('arma3/server.cfg.twig', [
             'hostname' => addslashes($server->name),
             'password' => addslashes((string) $server->password),
-            'admin_password' => addslashes((string) $server->admin_password),
+            'admin_password' => addslashes((string) $settings->admin_password),
             'max_players' => (int) $server->max_players,
-            'verify_signatures' => $server->verify_signatures ? 2 : 0,
-            'allowed_file_patching' => $server->allowed_file_patching ? 2 : 0,
-            'disable_von' => $server->von_enabled ? 0 : 1,
-            'persistent' => $server->persistent ? 1 : 0,
-            'battle_eye' => $server->battle_eye ? 1 : 0,
+            'verify_signatures' => $settings->verify_signatures ? 2 : 0,
+            'allowed_file_patching' => $settings->allowed_file_patching ? 2 : 0,
+            'disable_von' => $settings->von_enabled ? 0 : 1,
+            'persistent' => $settings->persistent ? 1 : 0,
+            'battle_eye' => $settings->battle_eye ? 1 : 0,
             'motd_lines' => $server->description
                 ? array_map(fn (string $line) => addslashes(trim($line)), explode("\n", $server->description))
                 : null,
-            'additional_server_options' => $server->additional_server_options ?: null,
+            'additional_server_options' => $settings->additional_server_options ?: null,
         ]);
 
         file_put_contents(
@@ -739,6 +741,14 @@ final class Arma3Handler implements DetectsServerState, GameHandler, ManagesModA
     protected function getDefaultSettings(): Arma3Settings
     {
         $settings = new Arma3Settings;
+        // Server option defaults
+        $settings->admin_password = null;
+        $settings->verify_signatures = true;
+        $settings->allowed_file_patching = false;
+        $settings->battle_eye = true;
+        $settings->persistent = false;
+        $settings->von_enabled = true;
+        $settings->additional_server_options = null;
         // Difficulty defaults
         $settings->reduced_damage = false;
         $settings->group_indicators = 2;

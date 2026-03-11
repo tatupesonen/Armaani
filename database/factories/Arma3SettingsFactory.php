@@ -17,6 +17,14 @@ class Arma3SettingsFactory extends Factory
     {
         return [
             'server_id' => Server::factory(),
+            // Server options
+            'admin_password' => null,
+            'verify_signatures' => true,
+            'allowed_file_patching' => false,
+            'battle_eye' => true,
+            'persistent' => false,
+            'von_enabled' => true,
+            'additional_server_options' => null,
             // Difficulty settings
             'reduced_damage' => false,
             'group_indicators' => 2,

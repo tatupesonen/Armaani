@@ -4,13 +4,14 @@ namespace App\GameHandlers;
 
 use App\Contracts\DetectsServerState;
 use App\Contracts\GameHandler;
+use App\Contracts\HasQueryPort;
 use App\Contracts\SteamGameHandler;
 use App\Models\ModPreset;
 use App\Models\ProjectZomboidSettings;
 use App\Models\Server;
 use App\Services\Renderer\TwigConfigRenderer;
 
-final class ProjectZomboidHandler implements DetectsServerState, GameHandler, SteamGameHandler
+final class ProjectZomboidHandler implements DetectsServerState, GameHandler, HasQueryPort, SteamGameHandler
 {
     public function __construct(
         protected TwigConfigRenderer $configRenderer,
@@ -78,11 +79,13 @@ final class ProjectZomboidHandler implements DetectsServerState, GameHandler, St
         $profileName = $this->getProfileName($server);
         $cachedir = $server->getProfilesPath();
 
+        $settings = $server->projectzomboidSettings;
+
         $params = [
             $binary,
             '-servername', $profileName,
             '-cachedir='.$cachedir,
-            '-adminpassword', $server->admin_password,
+            '-adminpassword', $settings?->admin_password ?? '',
         ];
 
         if ($server->additional_params) {
@@ -152,7 +155,7 @@ final class ProjectZomboidHandler implements DetectsServerState, GameHandler, St
                 'createLabel' => 'Project Zomboid Options',
                 'fields' => [
                     ['key' => 'password', 'label' => 'Server Password', 'type' => 'text', 'default' => '', 'placeholder' => 'Leave empty for no password', 'source' => 'server'],
-                    ['key' => 'admin_password', 'label' => 'Admin Password', 'type' => 'text', 'default' => '', 'placeholder' => 'Required for server startup', 'required' => true, 'source' => 'server'],
+                    ['key' => 'admin_password', 'label' => 'Admin Password', 'type' => 'text', 'default' => '', 'placeholder' => 'Required for server startup', 'required' => true, 'source' => 'projectzomboid_settings'],
                     ['type' => 'separator'],
                     ['key' => 'open', 'label' => 'Public Server', 'type' => 'toggle', 'default' => true, 'source' => 'projectzomboid_settings', 'description' => 'Show in the public server browser.'],
                     ['key' => 'pvp', 'label' => 'PVP', 'type' => 'toggle', 'default' => true, 'source' => 'projectzomboid_settings'],
@@ -197,7 +200,6 @@ final class ProjectZomboidHandler implements DetectsServerState, GameHandler, St
     {
         return [
             'password' => ['nullable', 'string', 'max:255'],
-            'admin_password' => ['required', 'string', 'max:255'],
             'additional_params' => ['nullable', 'string', 'max:1000'],
         ];
     }
@@ -205,6 +207,7 @@ final class ProjectZomboidHandler implements DetectsServerState, GameHandler, St
     public function settingsValidationRules(): array
     {
         return [
+            'admin_password' => ['required', 'string', 'max:255'],
             'pvp' => ['boolean'],
             'pause_empty' => ['boolean'],
             'global_chat' => ['boolean'],

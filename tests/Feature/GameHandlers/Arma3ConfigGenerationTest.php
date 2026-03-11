@@ -51,15 +51,8 @@ class Arma3ConfigGenerationTest extends TestCase
         $server = $this->createArma3Server([
             'name' => 'Test Server',
             'password' => null,
-            'admin_password' => null,
             'max_players' => 32,
-            'verify_signatures' => true,
-            'allowed_file_patching' => false,
-            'von_enabled' => true,
-            'persistent' => false,
-            'battle_eye' => true,
             'description' => null,
-            'additional_server_options' => null,
         ]);
 
         $expected = $this->buildExpectedServerCfg($server);
@@ -73,16 +66,18 @@ class Arma3ConfigGenerationTest extends TestCase
         $server = $this->createArma3Server([
             'name' => 'My "Awesome" Server',
             'password' => 'secret',
-            'admin_password' => 'admin123',
             'max_players' => 64,
+            'description' => "Welcome to the server\nHave fun!\nPlay fair",
+        ]);
+        $server->arma3Settings()->update([
+            'admin_password' => 'admin123',
             'verify_signatures' => false,
             'allowed_file_patching' => true,
             'von_enabled' => false,
             'persistent' => true,
             'battle_eye' => false,
-            'description' => "Welcome to the server\nHave fun!\nPlay fair",
-            'additional_server_options' => null,
         ]);
+        $server->refresh();
 
         $expected = $this->buildExpectedServerCfg($server);
         $actual = $this->generateAndReadServerCfg($server);
@@ -95,11 +90,13 @@ class Arma3ConfigGenerationTest extends TestCase
         $server = $this->createArma3Server([
             'name' => 'Test Server',
             'password' => null,
-            'admin_password' => null,
             'max_players' => 32,
             'description' => null,
+        ]);
+        $server->arma3Settings()->update([
             'additional_server_options' => 'myCustomOption = 1;',
         ]);
+        $server->refresh();
 
         $expected = $this->buildExpectedServerCfg($server);
         $actual = $this->generateAndReadServerCfg($server);
@@ -112,11 +109,14 @@ class Arma3ConfigGenerationTest extends TestCase
         $server = $this->createArma3Server([
             'name' => 'Full Server',
             'password' => 'pass',
-            'admin_password' => 'adminpass',
             'max_players' => 128,
             'description' => "Line one\nLine two",
+        ]);
+        $server->arma3Settings()->update([
+            'admin_password' => 'adminpass',
             'additional_server_options' => "extraSetting = \"value\";\nanotherSetting = 42;",
         ]);
+        $server->refresh();
 
         $expected = $this->buildExpectedServerCfg($server);
         $actual = $this->generateAndReadServerCfg($server);
@@ -263,26 +263,27 @@ class Arma3ConfigGenerationTest extends TestCase
 
     private function buildExpectedServerCfg(Server $server): string
     {
+        $settings = $server->arma3Settings;
         $lines = [];
 
         $lines[] = '// GLOBAL SETTINGS';
         $lines[] = 'hostname = "'.addslashes($server->name).'";';
         $lines[] = 'password = "'.addslashes((string) $server->password).'";';
-        $lines[] = 'passwordAdmin = "'.addslashes((string) $server->admin_password).'";';
+        $lines[] = 'passwordAdmin = "'.addslashes((string) $settings->admin_password).'";';
         $lines[] = '';
         $lines[] = '// JOINING RULES';
         $lines[] = 'maxPlayers = '.(int) $server->max_players.';';
         $lines[] = 'kickDuplicate = 1;';
-        $lines[] = 'verifySignatures = '.($server->verify_signatures ? '2' : '0').';';
-        $lines[] = 'allowedFilePatching = '.($server->allowed_file_patching ? '2' : '0').';';
+        $lines[] = 'verifySignatures = '.($settings->verify_signatures ? '2' : '0').';';
+        $lines[] = 'allowedFilePatching = '.($settings->allowed_file_patching ? '2' : '0').';';
         $lines[] = '';
         $lines[] = '// INGAME SETTINGS';
-        $lines[] = 'disableVoN = '.($server->von_enabled ? '0' : '1').';';
+        $lines[] = 'disableVoN = '.($settings->von_enabled ? '0' : '1').';';
         $lines[] = 'vonCodec = 1;';
         $lines[] = 'vonCodecQuality = 30;';
-        $lines[] = 'persistent = '.($server->persistent ? '1' : '0').';';
+        $lines[] = 'persistent = '.($settings->persistent ? '1' : '0').';';
         $lines[] = 'timeStampFormat = "short";';
-        $lines[] = 'BattlEye = '.($server->battle_eye ? '1' : '0').';';
+        $lines[] = 'BattlEye = '.($settings->battle_eye ? '1' : '0').';';
         $lines[] = '';
         $lines[] = '// SIGNATURE VERIFICATION';
         $lines[] = 'onUnsignedData = "kick (_this select 0)";';
@@ -306,10 +307,10 @@ class Arma3ConfigGenerationTest extends TestCase
             $lines[] = '};';
         }
 
-        if ($server->additional_server_options) {
+        if ($settings->additional_server_options) {
             $lines[] = '';
             $lines[] = '// ADDITIONAL OPTIONS';
-            $lines[] = $server->additional_server_options;
+            $lines[] = $settings->additional_server_options;
         }
 
         return implode("\n", $lines)."\n";

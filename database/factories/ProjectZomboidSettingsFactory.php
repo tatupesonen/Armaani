@@ -20,6 +20,7 @@ class ProjectZomboidSettingsFactory extends Factory
     {
         return [
             'server_id' => Server::factory()->forProjectZomboid(),
+            'admin_password' => fake()->password(6, 12),
             'pvp' => true,
             'pause_empty' => true,
             'global_chat' => true,

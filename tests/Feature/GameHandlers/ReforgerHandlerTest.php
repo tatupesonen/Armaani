@@ -162,11 +162,11 @@ class ReforgerHandlerTest extends TestCase
         $server = $this->createReforgerServer([
             'name' => 'My Reforger Server',
             'password' => 'secret',
-            'admin_password' => 'admin123',
             'max_players' => 64,
         ]);
 
         $server->reforgerSettings()->update([
+            'admin_password' => 'admin123',
             'scenario_id' => '{ECC61978EDCC2B5A}Missions/23_Campaign.conf',
         ]);
         $server->refresh();

@@ -202,7 +202,7 @@ class SettingsSchemaTest extends TestCase
         $this->assertEquals('scenario-picker', $scenarioField['component']);
     }
 
-    public function test_reforger_schema_battle_eye_source_is_server(): void
+    public function test_reforger_schema_battle_eye_inherits_section_source(): void
     {
         $handler = app(ReforgerHandler::class);
         $schema = $handler->settingsSchema();
@@ -210,7 +210,9 @@ class SettingsSchemaTest extends TestCase
         $section = collect($schema)->firstWhere('title', 'Reforger Settings');
         $battleEye = collect($section['fields'])->firstWhere('key', 'battle_eye');
 
-        $this->assertEquals('server', $battleEye['source']);
+        // battle_eye no longer has its own source — it inherits from the section's source (reforger_settings)
+        $this->assertArrayNotHasKey('source', $battleEye);
+        $this->assertEquals('reforger_settings', $section['source']);
     }
 
     public function test_dayz_handler_returns_empty_settings_schema(): void
@@ -485,11 +487,6 @@ class SettingsSchemaTest extends TestCase
         foreach ($schema as $section) {
             foreach ($section['fields'] ?? [] as $field) {
                 if ($field['type'] === 'separator' || ! isset($field['key'])) {
-                    continue;
-                }
-
-                // battle_eye is a server-level field validated in StoreServerRequest
-                if ($field['key'] === 'battle_eye') {
                     continue;
                 }
 

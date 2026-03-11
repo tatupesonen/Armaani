@@ -15,6 +15,14 @@ class Arma3Settings extends Model
 
     protected $fillable = [
         'server_id',
+        // Server options (moved from servers table)
+        'admin_password',
+        'verify_signatures',
+        'allowed_file_patching',
+        'battle_eye',
+        'persistent',
+        'von_enabled',
+        'additional_server_options',
         // Difficulty settings
         'reduced_damage',
         'group_indicators',
@@ -59,6 +67,12 @@ class Arma3Settings extends Model
     protected function casts(): array
     {
         return [
+            // Server options
+            'verify_signatures' => 'boolean',
+            'allowed_file_patching' => 'boolean',
+            'battle_eye' => 'boolean',
+            'persistent' => 'boolean',
+            'von_enabled' => 'boolean',
             // Difficulty
             'reduced_damage' => 'boolean',
             'group_indicators' => 'integer',

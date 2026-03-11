@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Server;
 
+use App\Contracts\DetectsServerState;
 use App\GameManager;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -23,6 +24,7 @@ class StoreServerRequest extends FormRequest
             $handlerRules = $handler->serverValidationRules();
             $settingsRules = $handler->settingsValidationRules();
         } catch (\InvalidArgumentException) {
+            $handler = null;
             $handlerRules = [];
             $settingsRules = [];
         }
@@ -35,6 +37,7 @@ class StoreServerRequest extends FormRequest
             'description' => ['nullable', 'string', 'max:1000'],
             'active_preset_id' => ['nullable', 'exists:mod_presets,id'],
             'game_install_id' => ['required', 'exists:game_installs,id'],
+            ...($handler instanceof DetectsServerState ? ['auto_restart' => ['boolean']] : []),
             ...$handlerRules,
             ...$settingsRules,
         ];
