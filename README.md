@@ -16,13 +16,20 @@ Built with Laravel 12, Inertia v2, React 19, Tailwind CSS v4, and with a bunch o
 
 ## Supported servers
 - Arma 3
+    - Full workshop mod support built-in
 - Arma Reforger
+    - Support for mods, no support for mod JSON imports yet.
 - Factorio
+    - Downloads using [app/Services/HttpGameInstaller.php](HttpGameInstaller)
+    - No mods support yet
 - Project Zomboid
+    - Basic support (can start and manage basic server settings, eg. city, sleep allowed, lua checksums)
 
 ### WIP Servers
 - DayZ
+    - Planning to have full support for mods
 - Counter-Strike 2
+    - Will add RCON support to the application and perhaps some CS2 specific configuration options
 
 ## Features
 
