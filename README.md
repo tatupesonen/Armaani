@@ -14,6 +14,16 @@ Built with Laravel 12, Inertia v2, React 19, Tailwind CSS v4, and with a bunch o
 
 ![Servers](docs/servers.png)
 
+## Supported servers
+- Arma 3
+- Arma Reforger
+- Factorio
+- Project Zomboid
+
+### WIP Servers
+- DayZ
+- Counter-Strike 2
+
 ## Features
 
 - Install and update game servers via SteamCMD
