@@ -186,13 +186,13 @@ final class Arma3Handler extends AbstractGameHandler implements DetectsServerSta
         }
 
         foreach ($preset->mods as $mod) {
-            $modKeysPath = $mod->getInstallationPath().'/keys';
+            $modPath = $mod->getInstallationPath();
 
-            if (! is_dir($modKeysPath)) {
+            if (! is_dir($modPath)) {
                 continue;
             }
 
-            foreach (glob($modKeysPath.'/*.bikey') ?: [] as $bikeyFile) {
+            foreach ($this->findBiKeyFiles($modPath) as $bikeyFile) {
                 $destPath = $keysPath.'/'.basename($bikeyFile);
 
                 if (is_link($destPath) && ! file_exists($destPath)) {
@@ -205,6 +205,33 @@ final class Arma3Handler extends AbstractGameHandler implements DetectsServerSta
                 }
             }
         }
+    }
+
+    /**
+     * Recursively find all .bikey files within a mod directory.
+     * Mod authors use inconsistent casing (keys, Keys, Key) and nesting,
+     * so we scan the entire mod tree rather than checking a hardcoded path.
+     *
+     * @return array<int, string>
+     */
+    protected function findBiKeyFiles(string $modPath): array
+    {
+        $bikeys = [];
+
+        $directory = new \RecursiveDirectoryIterator($modPath, \RecursiveDirectoryIterator::SKIP_DOTS);
+
+        // Skip symlinked directories to avoid infinite loops from circular symlinks.
+        $filtered = new \RecursiveCallbackFilterIterator($directory, function (\SplFileInfo $current) {
+            return ! ($current->isDir() && $current->isLink());
+        });
+
+        foreach (new \RecursiveIteratorIterator($filtered) as $file) {
+            if ($file->isFile() && strcasecmp($file->getExtension(), 'bikey') === 0) {
+                $bikeys[] = $file->getPathname();
+            }
+        }
+
+        return $bikeys;
     }
 
     // --- SupportsMissions ---

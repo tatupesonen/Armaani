@@ -92,9 +92,19 @@ trait InteractsWithModDownloads
 
     /**
      * Mark a mod as failed and broadcast the failure.
+     * Still converts to lowercase if files were partially written,
+     * so that any retry or server start doesn't hit casing issues.
      */
-    protected function markModFailed(WorkshopMod $mod, string $errorOutput, string $context): void
+    protected function markModFailed(WorkshopMod $mod, string $errorOutput, string $context, ?GameHandler $handler = null): void
     {
+        if ($handler instanceof SupportsWorkshopMods && $handler->requiresLowercaseConversion()) {
+            $modPath = $mod->getInstallationPath();
+
+            if (is_dir($modPath)) {
+                $this->convertToLowercase($modPath);
+            }
+        }
+
         Log::error("{$context} Download failed: {$errorOutput}");
         $mod->update(['installation_status' => InstallationStatus::Failed]);
         ModDownloadOutput::dispatch($mod->id, 0, 'Download failed: '.$errorOutput);

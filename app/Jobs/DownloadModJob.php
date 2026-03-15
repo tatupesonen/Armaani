@@ -58,7 +58,7 @@ class DownloadModJob implements ShouldQueue
         if ($result->successful()) {
             $this->finalizeSuccessfulMod($this->mod, $handler, $context);
         } else {
-            $this->markModFailed($this->mod, $result->errorOutput(), $context);
+            $this->markModFailed($this->mod, $result->errorOutput(), $context, $handler);
             $this->fail(new \RuntimeException('SteamCMD failed: '.$result->errorOutput()));
         }
     }

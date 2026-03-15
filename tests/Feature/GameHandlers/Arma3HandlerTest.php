@@ -529,7 +529,7 @@ class Arma3HandlerTest extends TestCase
         $this->assertEquals('fake bikey content', file_get_contents($gameInstallPath.'/keys/testmod.bikey'));
     }
 
-    public function test_copy_bikeys_only_checks_keys_subdirectory(): void
+    public function test_copy_bikeys_finds_bikeys_in_nested_directories(): void
     {
         $server = $this->makeServer();
         $gameInstallPath = $server->gameInstall->getInstallationPath();
@@ -537,12 +537,12 @@ class Arma3HandlerTest extends TestCase
         $mod = WorkshopMod::factory()->installed()->create(['name' => 'DeepMod']);
         $modPath = $mod->getInstallationPath();
 
-        // Place bikey outside the conventional keys/ dir — should NOT be found
+        // Place bikey deep inside the mod tree — should still be found
         $deepDir = $modPath.'/addons/keys/subdir';
         @mkdir($deepDir, 0755, true);
         file_put_contents($deepDir.'/deep.bikey', 'deep key');
 
-        // Place bikey in the conventional keys/ dir — should be found
+        // Place bikey in the conventional keys/ dir — should also be found
         @mkdir($modPath.'/keys', 0755, true);
         file_put_contents($modPath.'/keys/found.bikey', 'found key');
 
@@ -555,7 +555,30 @@ class Arma3HandlerTest extends TestCase
         $this->handler->copyBiKeys($server);
 
         $this->assertFileExists($gameInstallPath.'/keys/found.bikey');
-        $this->assertFileDoesNotExist($gameInstallPath.'/keys/deep.bikey');
+        $this->assertFileExists($gameInstallPath.'/keys/deep.bikey');
+    }
+
+    public function test_copy_bikeys_finds_bikeys_with_uppercase_keys_directory(): void
+    {
+        $server = $this->makeServer();
+        $gameInstallPath = $server->gameInstall->getInstallationPath();
+
+        $mod = WorkshopMod::factory()->installed()->create(['name' => 'RHSMod']);
+        $modPath = $mod->getInstallationPath();
+
+        // Use uppercase Keys directory as many mods (RHS, CUP, etc.) do
+        @mkdir($modPath.'/Keys', 0755, true);
+        file_put_contents($modPath.'/Keys/rhsmod.bikey', 'rhs key data');
+
+        $preset = ModPreset::factory()->create();
+        $preset->mods()->attach([$mod->id]);
+
+        $server->update(['active_preset_id' => $preset->id]);
+        $server->refresh();
+
+        $this->handler->copyBiKeys($server);
+
+        $this->assertFileExists($gameInstallPath.'/keys/rhsmod.bikey');
     }
 
     public function test_copy_bikeys_creates_keys_directory_if_not_exists(): void

@@ -136,7 +136,7 @@ class BatchDownloadModsJob implements ShouldQueue
             }
         } else {
             foreach ($this->mods as $mod) {
-                $this->markModFailed($mod, $result->errorOutput(), "[BatchDownload] Mod {$mod->workshop_id}");
+                $this->markModFailed($mod, $result->errorOutput(), "[BatchDownload] Mod {$mod->workshop_id}", $handler);
             }
         }
     }
