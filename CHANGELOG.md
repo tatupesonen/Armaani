@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.8.3](https://github.com/tatupesonen/Armaani/compare/v1.8.2...v1.8.3) (2026-03-15)
+
+
+### Bug Fixes
+
+* bikey files not found due to case-sensitive path and missing lowercase conversion on failed downloads ([a6c780b](https://github.com/tatupesonen/Armaani/commit/a6c780bf2318e616a3c512277daafdcf94d717bb))
+* don't scroll to top when restarting servers ([7faca4e](https://github.com/tatupesonen/Armaani/commit/7faca4ebc7e37cd8806d774214f78e4deea50bd7))
+
 ## [1.8.2](https://github.com/tatupesonen/Armaani/compare/v1.8.1...v1.8.2) (2026-03-11)
 
 
