@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.5](https://github.com/tatupesonen/Armaani/compare/v1.8.4...v1.8.5) (2026-03-15)
+
+
+### Bug Fixes
+
+* race condition in mission upload ([b610b43](https://github.com/tatupesonen/Armaani/commit/b610b4366b93148ab042db0bd39eb5e0c8bd9180))
+
 ## [1.8.4](https://github.com/tatupesonen/Armaani/compare/v1.8.3...v1.8.4) (2026-03-15)
 
 
