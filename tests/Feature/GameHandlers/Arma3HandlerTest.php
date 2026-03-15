@@ -441,16 +441,16 @@ class Arma3HandlerTest extends TestCase
         $this->assertEquals($mod2Path, readlink($gameInstallPath.'/'.$mod2->getNormalizedName()));
     }
 
-    public function test_symlink_mods_removes_stale_mod_symlinks(): void
+    public function test_symlink_mods_removes_broken_symlinks(): void
     {
         $server = $this->makeServer();
         $gameInstallPath = $server->gameInstall->getInstallationPath();
 
-        // Create a stale symlink
+        // Create a broken symlink (target doesn't exist)
         @mkdir($gameInstallPath, 0755, true);
-        $staleTarget = sys_get_temp_dir().'/stale_mod_'.uniqid();
-        @mkdir($staleTarget, 0755, true);
-        symlink($staleTarget, $gameInstallPath.'/@OldMod');
+        symlink('/nonexistent/path/to/mod', $gameInstallPath.'/@BrokenMod');
+        $this->assertTrue(is_link($gameInstallPath.'/@BrokenMod'));
+        $this->assertFalse(file_exists($gameInstallPath.'/@BrokenMod'));
 
         $preset = ModPreset::factory()->create();
         $server->update(['active_preset_id' => $preset->id]);
@@ -458,10 +458,33 @@ class Arma3HandlerTest extends TestCase
 
         $this->handler->symlinkMods($server);
 
-        $this->assertFalse(is_link($gameInstallPath.'/@OldMod'));
+        $this->assertFalse(is_link($gameInstallPath.'/@BrokenMod'));
+    }
+
+    public function test_symlink_mods_preserves_valid_symlinks_from_other_servers(): void
+    {
+        $server = $this->makeServer();
+        $gameInstallPath = $server->gameInstall->getInstallationPath();
+        @mkdir($gameInstallPath, 0755, true);
+
+        // Create a valid symlink that belongs to another server's preset
+        $otherModTarget = sys_get_temp_dir().'/other_server_mod_'.uniqid();
+        @mkdir($otherModTarget, 0755, true);
+        symlink($otherModTarget, $gameInstallPath.'/@OtherServerMod');
+        $this->assertTrue(is_link($gameInstallPath.'/@OtherServerMod'));
+
+        $preset = ModPreset::factory()->create();
+        $server->update(['active_preset_id' => $preset->id]);
+        $server->refresh();
+
+        $this->handler->symlinkMods($server);
+
+        // Valid symlink from another server must survive
+        $this->assertTrue(is_link($gameInstallPath.'/@OtherServerMod'));
+        $this->assertEquals($otherModTarget, readlink($gameInstallPath.'/@OtherServerMod'));
 
         // Cleanup
-        @rmdir($staleTarget);
+        @rmdir($otherModTarget);
     }
 
     public function test_symlink_mods_skips_when_no_preset(): void
@@ -525,8 +548,11 @@ class Arma3HandlerTest extends TestCase
 
         $this->handler->copyBiKeys($server);
 
-        $this->assertFileExists($gameInstallPath.'/keys/testmod.bikey');
-        $this->assertEquals('fake bikey content', file_get_contents($gameInstallPath.'/keys/testmod.bikey'));
+        $destPath = $gameInstallPath.'/keys/testmod.bikey';
+        $this->assertFileExists($destPath);
+        $this->assertFalse(is_link($destPath), 'BiKey should be a real copy, not a symlink');
+        $this->assertEquals('fake bikey content', file_get_contents($destPath));
+        $this->assertEquals('0644', substr(sprintf('%o', fileperms($destPath)), -4));
     }
 
     public function test_copy_bikeys_finds_bikeys_in_nested_directories(): void
@@ -607,7 +633,7 @@ class Arma3HandlerTest extends TestCase
         $this->assertFileExists($keysPath.'/keymod.bikey');
     }
 
-    public function test_copy_bikeys_replaces_broken_symlinks(): void
+    public function test_copy_bikeys_replaces_broken_symlinks_with_copies(): void
     {
         $server = $this->makeServer();
         $gameInstallPath = $server->gameInstall->getInstallationPath();
@@ -633,9 +659,41 @@ class Arma3HandlerTest extends TestCase
 
         $this->handler->copyBiKeys($server);
 
-        $this->assertFileExists($keysPath.'/testmod.bikey');
+        $destPath = $keysPath.'/testmod.bikey';
+        $this->assertFileExists($destPath);
+        $this->assertFalse(is_link($destPath), 'Should be a real copy, not a symlink');
+        $this->assertEquals('valid bikey content', file_get_contents($destPath));
+    }
+
+    public function test_copy_bikeys_replaces_existing_symlinks_with_copies(): void
+    {
+        $server = $this->makeServer();
+        $gameInstallPath = $server->gameInstall->getInstallationPath();
+        $keysPath = $gameInstallPath.'/keys';
+        @mkdir($keysPath, 0755, true);
+
+        $mod = WorkshopMod::factory()->installed()->create(['name' => 'TestMod']);
+        $modPath = $mod->getInstallationPath();
+        @mkdir($modPath.'/keys', 0755, true);
+        file_put_contents($modPath.'/keys/testmod.bikey', 'bikey content');
+
+        // Create a valid symlink (from a previous version of the application)
+        symlink($modPath.'/keys/testmod.bikey', $keysPath.'/testmod.bikey');
         $this->assertTrue(is_link($keysPath.'/testmod.bikey'));
-        $this->assertEquals('valid bikey content', file_get_contents($keysPath.'/testmod.bikey'));
+
+        $preset = ModPreset::factory()->create();
+        $preset->mods()->attach([$mod->id]);
+
+        $server->update(['active_preset_id' => $preset->id]);
+        $server->refresh();
+
+        $this->handler->copyBiKeys($server);
+
+        $destPath = $keysPath.'/testmod.bikey';
+        $this->assertFileExists($destPath);
+        $this->assertFalse(is_link($destPath), 'Existing symlink should be replaced with a real copy');
+        $this->assertEquals('bikey content', file_get_contents($destPath));
+        $this->assertEquals('0644', substr(sprintf('%o', fileperms($destPath)), -4));
     }
 
     public function test_copy_bikeys_skips_when_no_preset(): void

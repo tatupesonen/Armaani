@@ -145,11 +145,13 @@ final class Arma3Handler extends AbstractGameHandler implements DetectsServerSta
 
         $gameInstallPath = $server->gameInstall->getInstallationPath();
 
-        // Remove existing mod symlinks (anything starting with @)
+        // Only remove broken symlinks — valid ones may belong to other servers
+        // sharing this game install and must be preserved.
         $existingLinks = glob($gameInstallPath.'/@*') ?: [];
         foreach ($existingLinks as $link) {
-            if (is_link($link)) {
+            if (is_link($link) && ! file_exists($link)) {
                 unlink($link);
+                Log::info("[Server:{$server->id}] Removed broken mod symlink: ".basename($link));
             }
         }
 
@@ -166,6 +168,7 @@ final class Arma3Handler extends AbstractGameHandler implements DetectsServerSta
 
             if (! file_exists($linkPath)) {
                 symlink($modInstallPath, $linkPath);
+                chmod($linkPath, 0755);
                 Log::info("[Server:{$server->id}] Symlinked mod {$mod->getNormalizedName()} -> {$modInstallPath}");
             }
         }
@@ -195,13 +198,15 @@ final class Arma3Handler extends AbstractGameHandler implements DetectsServerSta
             foreach ($this->findBiKeyFiles($modPath) as $bikeyFile) {
                 $destPath = $keysPath.'/'.basename($bikeyFile);
 
-                if (is_link($destPath) && ! file_exists($destPath)) {
+                // Replace broken symlinks or existing symlinks with real copies
+                if (is_link($destPath)) {
                     unlink($destPath);
                 }
 
                 if (! file_exists($destPath)) {
-                    symlink($bikeyFile, $destPath);
-                    Log::info("[Server:{$server->id}] Symlinked BiKey ".basename($bikeyFile)." from mod '{$mod->name}'");
+                    copy($bikeyFile, $destPath);
+                    chmod($destPath, 0644);
+                    Log::info("[Server:{$server->id}] Copied BiKey ".basename($bikeyFile)." from mod '{$mod->name}'");
                 }
             }
         }
