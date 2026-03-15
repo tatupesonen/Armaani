@@ -1,4 +1,5 @@
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
+import type { AxiosProgressEvent } from 'axios';
 import { Download, Trash2, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
 import ConfirmDeleteDialog from '@/components/confirm-delete-dialog';
@@ -29,20 +30,31 @@ export default function MissionsIndex({ missions }: Props) {
         null,
     );
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const uploadForm = useForm<{ missions: File[] }>({ missions: [] });
+    const [uploading, setUploading] = useState(false);
+    const [progress, setProgress] = useState<AxiosProgressEvent | null>(null);
 
     function handleUpload(files: FileList | null) {
         if (!files || files.length === 0) return;
 
-        uploadForm.setData('missions', Array.from(files));
-        uploadForm.post(store.url(), {
-            forceFormData: true,
-            preserveScroll: true,
-            onSuccess: () => {
-                if (fileInputRef.current) fileInputRef.current.value = '';
-                uploadForm.reset();
+        router.post(
+            store.url(),
+            { missions: Array.from(files) },
+            {
+                forceFormData: true,
+                preserveScroll: true,
+                onStart: () => setUploading(true),
+                onProgress: (p) => {
+                    if (p) setProgress(p);
+                },
+                onFinish: () => {
+                    setUploading(false);
+                    setProgress(null);
+                },
+                onSuccess: () => {
+                    if (fileInputRef.current) fileInputRef.current.value = '';
+                },
             },
-        });
+        );
     }
 
     function handleDelete() {
@@ -74,21 +86,26 @@ export default function MissionsIndex({ missions }: Props) {
                         />
                         <Button
                             onClick={() => fileInputRef.current?.click()}
-                            disabled={uploadForm.processing}
+                            disabled={uploading}
                         >
                             <Upload className="mr-2 size-4" />
-                            {uploadForm.processing
-                                ? 'Uploading...'
-                                : 'Upload Missions'}
+                            {uploading ? 'Uploading...' : 'Upload Missions'}
                         </Button>
-                        {uploadForm.progress && (
+                        {progress && (
                             <div className="flex w-48 items-center gap-2">
                                 <Progress
-                                    value={uploadForm.progress.percentage}
+                                    value={
+                                        progress.progress
+                                            ? progress.progress * 100
+                                            : 0
+                                    }
                                     className="h-2"
                                 />
                                 <span className="text-xs font-medium text-muted-foreground">
-                                    {uploadForm.progress.percentage}%
+                                    {progress.progress
+                                        ? Math.round(progress.progress * 100)
+                                        : 0}
+                                    %
                                 </span>
                             </div>
                         )}
